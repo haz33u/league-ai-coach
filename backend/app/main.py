@@ -7,6 +7,9 @@ from app.config import settings
 from app.api import summoner  # Импортируем наш новый router
 from app.api import summoner, match  # ← Импортируем  match
 from app.api import summoner, match, stats # Импортируем stats.py 
+from app.api import summoner, match, stats, ranked #Имортим ranked.py
+from app.api import summoner, match, stats, ranked, live  # Имопрт live.py
+from app.api import lcu # Импорт lcu.py
 
 # Create FastAPI app
 app = FastAPI(
@@ -51,6 +54,9 @@ async def health_check():
 app.include_router(summoner.router, prefix="/api/summoner", tags=["summoner"])
 app.include_router(match.router, prefix="/api/match", tags=["match"]) 
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
+app.include_router(ranked.router, prefix="/api/ranked", tags=["ranked"])
+app.include_router(live.router, prefix="/api/live", tags=["live"])
+app.include_router(lcu.router, prefix="/api/lcu", tags=["LCU"])
 
 if __name__ == "__main__":
     import uvicorn
