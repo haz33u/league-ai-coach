@@ -1,4 +1,4 @@
-# League AI Coach 🎮🤖
+# League AI Coach 
 
 AI-powered personal coaching platform for League of Legends players.
 
