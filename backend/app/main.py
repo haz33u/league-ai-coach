@@ -5,7 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api import summoner  # Импортируем наш новый router
-from app.api import summoner, match  # ← ДОБАВЬ match
+from app.api import summoner, match  # ← Импортируем  match
+from app.api import summoner, match, stats # Импортируем stats.py 
 
 # Create FastAPI app
 app = FastAPI(
@@ -49,7 +50,7 @@ async def health_check():
 # Подключаем summoner router
 app.include_router(summoner.router, prefix="/api/summoner", tags=["summoner"])
 app.include_router(match.router, prefix="/api/match", tags=["match"]) 
-
+app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 
 if __name__ == "__main__":
     import uvicorn
