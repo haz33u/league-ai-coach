@@ -6,7 +6,7 @@ pydantic-settings==2.6.0
 
 # Database
 sqlalchemy==2.0.36
-alembic==1.14.0
+alembic==1.14.0  # Исправлено с 1.13.1 на 1.14.0
 psycopg2-binary==2.9.10
 asyncpg==0.30.0
 
@@ -24,7 +24,7 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.18
 
 # ML/AI
-scikit-learn==1.6.0
+scikit-learn==0.16.0
 xgboost==2.1.3
 numpy==2.2.0
 pandas==2.2.3
@@ -40,10 +40,4 @@ pydantic-core==2.27.0
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.24.0
-httpx==0.28.0
 psutil==5.9.8
-#postgre
-psycopg2-binary==2.9.9
-alembic==1.13.1
-python-dotenv==1.0.0
-
