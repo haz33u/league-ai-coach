@@ -9,6 +9,7 @@ from app.api import summoner, match  # ← Импортируем  match
 from app.api import summoner, match, stats # Импортируем stats.py 
 from app.api import summoner, match, stats, ranked #Имортим ranked.py
 from app.api import summoner, match, stats, ranked, live  # Имопрт live.py
+from app.api import summoner, match, stats, ranked, players #Импорт players.py
 from app.api import lcu # Импорт lcu.py
 
 # Create FastAPI app
@@ -57,6 +58,8 @@ app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(ranked.router, prefix="/api/ranked", tags=["ranked"])
 app.include_router(live.router, prefix="/api/live", tags=["live"])
 app.include_router(lcu.router, prefix="/api/lcu", tags=["LCU"])
+app.include_router(players.router, prefix="/api")
+
 
 if __name__ == "__main__":
     import uvicorn
