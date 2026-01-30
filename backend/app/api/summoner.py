@@ -1,35 +1,27 @@
 """
 Summoner API endpoints
 """
-from fastapi import APIRouter, HTTPException
-from app.models.summoner import (
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from app.models_old.summoner import (
     SummonerRequest, 
     SummonerResponse, 
     AccountInfo, 
     SummonerInfo
 )
 from app.services.riot_api import RiotAPIService, RiotAPIError
+from app.database import get_db
+from app import crud
 
 
-# Создаём экземпляр сервиса
 riot_api = RiotAPIService()
-
 router = APIRouter()
 
 
 @router.post("/search", response_model=SummonerResponse)
-async def search_summoner(request: SummonerRequest):
+async def search_summoner(request: SummonerRequest, db: Session = Depends(get_db)):
     """
-    Поиск summoner по Riot ID (game name + tag)
-    
-    Example:
-        POST /api/summoner/search
-        {
-            "game_name": "hazeu ay lol",
-            "tag_line": "LOVE",
-            "region": "europe",
-            "platform": "ru"
-        }
+    Поиск summoner по Riot ID
     """
     try:
         # 1. Получаем account info (PUUID)
@@ -48,6 +40,18 @@ async def search_summoner(request: SummonerRequest):
         )
         
         summoner = SummonerInfo(**summoner_data)
+        
+        # 💾 Сохранение игрока в БД
+        player = crud.get_or_create_player(
+            db=db,
+            puuid=account.puuid,
+            game_name=request.game_name,
+            tag_line=request.tag_line,
+            region=request.region,
+            platform=request.platform,
+            summoner_level=summoner.summonerLevel,
+            profile_icon_id=summoner.profileIconId
+        )
         
         # 3. Получаем историю матчей
         try:

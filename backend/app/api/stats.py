@@ -6,7 +6,8 @@ from fastapi import APIRouter, HTTPException
 from collections import Counter
 from typing import Dict, Any, List
 from app.services.riot_api import RiotAPIService, RiotAPIError
-from app.models.summoner import SummonerRequest
+from app.models_old.summoner import SummonerRequest
+
 
 riot_api = RiotAPIService()
 router = APIRouter()

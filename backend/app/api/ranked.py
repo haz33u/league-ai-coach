@@ -3,10 +3,14 @@ Ranked API endpoints - ранковая информация
 Гибридный подход: LCU API + Riot API + Match History
 """
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Optional, List
+from sqlalchemy.orm import Session
 from app.services.riot_api import RiotAPIService, RiotAPIError
 from app.api.lcu import get_lcu_connection_info
+from app.database import get_db
+from app import crud
+
 
 riot_api = RiotAPIService()
 router = APIRouter()
@@ -327,7 +331,8 @@ async def get_ranked_by_name(
     game_name: str, 
     tag_line: str, 
     region: str = "europe", 
-    platform: str = "ru"
+    platform: str = "ru",
+    db: Session = Depends(get_db)
 ):
     """
     Получить ранковую информацию по имени игрока
@@ -356,10 +361,48 @@ async def get_ranked_by_name(
         summoner_level = summoner_data.get("summonerLevel", 0)
         summoner_id = summoner_data.get("id")
         
+        # 💾 Сохранение игрока в БД
+        player = crud.get_or_create_player(
+            db=db,
+            puuid=puuid,
+            game_name=game_name,
+            tag_line=tag_line,
+            region=region,
+            platform=platform,
+            summoner_level=summoner_level,
+            profile_icon_id=summoner_data.get("profileIconId")
+        )
+        
         # 3. МЕТОД 1: Попытка получить из LCU (приоритет!)
         lcu_data = await get_ranked_from_lcu()
         
         if lcu_data and lcu_data.get("ranked_solo"):
+            # 💾 Сохранение ranked stats из LCU
+            crud.create_or_update_ranked_stats(
+                db=db,
+                player_id=player.id,
+                queue_type="RANKED_SOLO_5x5",
+                tier=lcu_data["ranked_solo"]["tier"],
+                rank=lcu_data["ranked_solo"]["rank"],
+                lp=lcu_data["ranked_solo"]["lp"],
+                wins=lcu_data["ranked_solo"]["wins"],
+                losses=lcu_data["ranked_solo"]["losses"],
+                data_source="LCU"
+            )
+            
+            if lcu_data.get("ranked_flex"):
+                crud.create_or_update_ranked_stats(
+                    db=db,
+                    player_id=player.id,
+                    queue_type="RANKED_FLEX_SR",
+                    tier=lcu_data["ranked_flex"]["tier"],
+                    rank=lcu_data["ranked_flex"]["rank"],
+                    lp=lcu_data["ranked_flex"]["lp"],
+                    wins=lcu_data["ranked_flex"]["wins"],
+                    losses=lcu_data["ranked_flex"]["losses"],
+                    data_source="LCU"
+                )
+            
             return {
                 "player": {
                     "game_name": game_name,
@@ -380,6 +423,21 @@ async def get_ranked_by_name(
         )
         
         if apex_rank:
+            # 💾 Сохранение apex rank
+            crud.create_or_update_ranked_stats(
+                db=db,
+                player_id=player.id,
+                queue_type="RANKED_SOLO_5x5",
+                tier=apex_rank["tier"],
+                rank=apex_rank["rank"],
+                lp=apex_rank["lp"],
+                wins=apex_rank["wins"],
+                losses=apex_rank["losses"],
+                veteran=apex_rank["veteran"],
+                hot_streak=apex_rank["hot_streak"],
+                data_source="riot_api_apex"
+            )
+            
             total_games = apex_rank["wins"] + apex_rank["losses"]
             winrate = round((apex_rank["wins"] / total_games) * 100, 1) if total_games > 0 else 0
             
@@ -429,6 +487,21 @@ async def get_ranked_by_name(
                 
                 for queue in league_entries:
                     queue_type = queue.get("queueType")
+                    
+                    # 💾 Сохранение ranked stats
+                    crud.create_or_update_ranked_stats(
+                        db=db,
+                        player_id=player.id,
+                        queue_type=queue_type,
+                        tier=queue.get("tier"),
+                        rank=queue.get("rank"),
+                        lp=queue.get("leaguePoints", 0),
+                        wins=queue.get("wins", 0),
+                        losses=queue.get("losses", 0),
+                        veteran=queue.get("veteran", False),
+                        hot_streak=queue.get("hotStreak", False),
+                        data_source="riot_api"
+                    )
                     
                     wins = queue.get("wins", 0)
                     losses = queue.get("losses", 0)
