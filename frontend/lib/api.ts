@@ -1,8 +1,8 @@
-// Updated to use Next.js API Routes (no more CORS issues!)
+// API client for Nexus Oracle
+// Uses Next.js API Routes for secure server-side Riot API calls
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY || process.env.NEXT_PUBLIC_RIOT_API_KEY;
 
-// Regional routing endpoints
 const REGIONAL_ENDPOINTS: Record<string, string> = {
   'euw1': 'https://europe.api.riotgames.com',
   'eun1': 'https://europe.api.riotgames.com',
@@ -68,36 +68,32 @@ function formatGameDuration(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-// NEW: Use API Route instead of direct Riot API calls
 export async function searchPlayer(
   gameName: string,
   tagLine: string,
   region: string = 'euw1'
 ): Promise<PlayerStats> {
   try {
-    console.log('🔍 Searching player:', gameName, tagLine, region);
+    console.log('Searching player:', gameName, tagLine, region);
 
-    // Call our Next.js API route instead of Riot API directly
     const response = await fetch(
       `/api/search?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${region}`
     );
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('❌ API Route error:', errorData);
+      console.error('API Route error:', errorData);
       throw new Error(errorData.error || 'Player not found');
     }
 
     const data = await response.json();
-    console.log('✅ Player found:', data);
+    console.log('Player found:', data);
 
-    // Calculate additional stats
     const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
     let kda = 0;
     let mainChampion = 'Unknown';
     let mainRole = 'Unknown';
 
-    // Get match history for KDA and main champion/role
     try {
       const matchesRes = await fetch(
         `${regionalUrl}/lol/match/v5/matches/by-puuid/${data.puuid}/ids?start=0&count=10`,
@@ -148,7 +144,7 @@ export async function searchPlayer(
         }
       }
     } catch (e) {
-      console.warn('⚠️ Match history not available:', e);
+      console.warn('Match history not available:', e);
     }
 
     return {
@@ -159,17 +155,33 @@ export async function searchPlayer(
       recentForm: data.winRate,
     };
   } catch (error) {
-    console.error('❌ Search error:', error);
+    console.error('Search error:', error);
     throw error;
   }
 }
 
 export async function getPlayerStats(puuid: string, region: string = 'euw1'): Promise<PlayerStats> {
-  const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
+  try {
+    console.log('Fetching player stats:', puuid, region);
 
-  // This function still needs to be updated to use API routes
-  // For now, keeping original implementation
-  throw new Error('getPlayerStats needs to be implemented via API route');
+    const response = await fetch(
+      `/api/player?puuid=${encodeURIComponent(puuid)}&region=${region}`
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Player API error:', errorData);
+      throw new Error(errorData.error || 'Failed to load player data');
+    }
+
+    const data = await response.json();
+    console.log('Player stats loaded:', data);
+
+    return data;
+  } catch (error) {
+    console.error('getPlayerStats error:', error);
+    throw error;
+  }
 }
 
 export async function getMatchHistory(puuid: string, region: string = 'euw1'): Promise<MatchHistory[]> {
