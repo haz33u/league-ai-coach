@@ -11,6 +11,8 @@ export default function PlayerPage() {
   const searchParams = useSearchParams();
   const puuid = params.puuid as string;
   const region = searchParams.get('region') || 'euw1';
+  const gameName = searchParams.get('name') || 'Unknown';
+  const tagLine = searchParams.get('tag') || 'Unknown';
   
   const [playerData, setPlayerData] = useState<PlayerStats | null>(null);
   const [matches, setMatches] = useState<MatchHistory[]>([]);
@@ -26,6 +28,11 @@ export default function PlayerPage() {
         // Load player stats
         const data = await getPlayerStats(puuid, region);
         console.log('✅ Player loaded:', data);
+        
+        // Override with URL params if available
+        if (gameName !== 'Unknown') data.gameName = gameName;
+        if (tagLine !== 'Unknown') data.tagLine = tagLine;
+        
         setPlayerData(data);
         
         // Load match history
@@ -44,7 +51,7 @@ export default function PlayerPage() {
     if (puuid) {
       loadPlayer();
     }
-  }, [puuid, region]);
+  }, [puuid, region, gameName, tagLine]);
 
   if (loading) {
     return (
@@ -66,8 +73,17 @@ export default function PlayerPage() {
   }
 
   const getRankIcon = (tier: string) => {
+    if (!tier || tier === 'UNRANKED') {
+      return 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png';
+    }
     const tierLower = tier.toLowerCase();
     return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tierLower}.png`;
+  };
+
+  const getProfileIcon = (level: number) => {
+    // Use a default profile icon based on level
+    const iconId = (level % 28) + 1;
+    return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`;
   };
 
   return (
@@ -114,15 +130,16 @@ export default function PlayerPage() {
           <div className={styles.profileBanner}>
             <div className={styles.bannerBackground}></div>
             <div className={styles.profileContent}>
-              <div className={styles.rankIconContainer}>
+              <div className={styles.profileAvatarContainer}>
                 <img 
-                  src={getRankIcon(playerData.tier)} 
-                  alt={playerData.tier}
-                  className={styles.rankIcon}
+                  src={getProfileIcon(playerData.level)} 
+                  alt="Profile Icon"
+                  className={styles.profileAvatar}
                   onError={(e) => {
-                    e.currentTarget.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-iron.png';
+                    e.currentTarget.src = 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/profileicon/29.png';
                   }}
                 />
+                <div className={styles.levelBadge}>{playerData.level}</div>
               </div>
               <div className={styles.profileInfo}>
                 <h1 className={styles.playerName}>
@@ -133,7 +150,6 @@ export default function PlayerPage() {
                     {formatRank(playerData.tier, playerData.rank)}
                   </span>
                   <span className={styles.lpBadge}>{playerData.leaguePoints} LP</span>
-                  <span className={styles.levelBadge}>Level {playerData.level}</span>
                 </div>
               </div>
             </div>
@@ -215,7 +231,7 @@ export default function PlayerPage() {
                     alt={playerData.tier}
                     className={styles.rankIconLarge}
                     onError={(e) => {
-                      e.currentTarget.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-iron.png';
+                      e.currentTarget.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png';
                     }}
                   />
                 </div>
@@ -243,30 +259,32 @@ export default function PlayerPage() {
               </div>
             </div>
 
-            <a 
-              href={`/champion/${encodeURIComponent(playerData.mainChampion)}`}
-              className={`${styles.statCard} ${styles.purple} ${styles.clickable}`}
-              style={{ textDecoration: 'none', display: 'block' }}
-            >
+            <div className={`${styles.statCard} ${styles.purple}`}>
               <div className={styles.cardInner}>
                 <div className={styles.iconWrapperLarge}>
                   <div 
                     className={`champion-icon champion-${playerData.mainChampion.replace(/\s+/g, '')}`}
-                    style={{ width: '100%', height: '100%', borderRadius: '12px' }}
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      borderRadius: '12px',
+                      background: `url(https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${playerData.mainChampion.replace(/[\s']/g, '')}.png)`,
+                      backgroundSize: 'cover'
+                    }}
                   />
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Main Champion</p>
                   <h3 className={styles.value}>{playerData.mainChampion}</h3>
-                  <p className={styles.subtext}>Click for details →</p>
+                  <p className={styles.subtext}>Most played</p>
                 </div>
               </div>
-            </a>
+            </div>
 
           </div>
 
           {/* RECENT MATCHES */}
-          <h2 className={styles.sectionTitle}>Recent Matches (Live from Riot API)</h2>
+          <h2 className={styles.sectionTitle}>Recent Matches</h2>
           {matches.length === 0 ? (
             <div className={styles.noMatches}>
               <p>No recent matches found</p>
@@ -274,16 +292,22 @@ export default function PlayerPage() {
           ) : (
             <div className={styles.matchesContainer}>
               {matches.map((match, index) => (
-                <div key={index} className={styles.matchCard}>
-                  <div className={styles.matchResult} style={{ backgroundColor: match.win ? '#dcfce7' : '#fee2e2' }}>
-                    <span className={match.win ? styles.matchWin : styles.matchLoss}>
+                <div key={index} className={`${styles.matchCard} ${match.win ? styles.matchWin : styles.matchLoss}`}>
+                  <div className={styles.matchResult}>
+                    <span className={styles.matchResultText}>
                       {match.win ? 'Victory' : 'Defeat'}
                     </span>
                   </div>
                   <div className={styles.matchDetails}>
-                    <div className={`champion-icon champion-${match.champion}`} style={{ width: '56px', height: '56px', borderRadius: '8px', flexShrink: 0 }} />
+                    <div 
+                      className={styles.matchChampionIcon}
+                      style={{ 
+                        background: `url(https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${match.champion.replace(/[\s']/g, '')}.png)`,
+                        backgroundSize: 'cover'
+                      }} 
+                    />
                     <div className={styles.matchInfo}>
-                      <div className={styles.matchChamp}>{match.champion.replace(/([A-Z])/g, ' $1').trim()}</div>
+                      <div className={styles.matchChamp}>{match.champion}</div>
                       <div className={styles.matchMode}>{match.mode}</div>
                     </div>
                     <div className={styles.matchKDA}>
