@@ -1,45 +1,22 @@
-# League AI Coach 
+# Nexus Oracle
+League of Legends Analytics Platform
 
-AI-powered personal coaching platform for League of Legends players.
+Real-time player statistics powered by Riot Games API.
 
 ## Features
-
-- 📊 **Personalized Analytics** - Deep dive into your gameplay patterns
-- 🤖 **AI Insights** - ML-powered recommendations using Claude/Perplexity
-- 📈 **Win Prediction** - Forecast your performance and rank progression
-- 🎯 **Champion Select Advisor** - Real-time draft phase recommendations
-- 📉 **Skill Gap Analysis** - Identify weaknesses compared to higher elo players
+- Real-time player search (10 regions)
+- Live rank, LP, winrate, KDA from Riot API v4/v5
+- Match history with detailed analytics
+- Official League icons (Community Dragon)
+- Responsive design
 
 ## Tech Stack
+Next.js 14 • TypeScript • Tailwind CSS • Riot Games API
 
-**Backend:**
-- FastAPI (Python 3.11+)
-- PostgreSQL (database)
-- Redis (caching)
-- SQLAlchemy (ORM)
-- XGBoost (ML predictions)
-
-**AI/ML:**
-- Claude API (text insights)
-- Perplexity API (meta research)
-- scikit-learn (analytics)
-
-**Frontend:** (Coming soon)
-- React + TypeScript
-- Tailwind CSS
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- PostgreSQL 14+
-- Redis 7+
-- Riot API Key
-
-### Installation
-
-1. Clone the repository
+## Quick Setup
 ```bash
-git clone <your-repo-url>
-cd league-ai-coach
+git clone https://github.com/haz3141/lol-ai-coach.git
+cd lol-ai-coach/frontend
+npm install
+# Add Riot API key to .env.local
+npm run dev
