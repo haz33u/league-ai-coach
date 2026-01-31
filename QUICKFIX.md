@@ -1,137 +1,133 @@
-# ⚡ QUICKFIX - Player Search Not Working
+# Quick Resolution Guide
 
-## 🚨 Problem
-Searching for any player returns **"Player not found"**
+## Problem Statement
 
-## ✅ Solution (5 minutes)
+Player search functionality returns "Player not found" error for all queries.
 
-### Step 1: Get Fresh API Key
+## Solution Overview
 
-1. Open: https://developer.riotgames.com/
-2. Click **"REGENERATE API KEY"** button
-3. Copy the new key (starts with `RGAPI-`)
+This issue typically stems from an expired Development API key, which requires renewal every 24 hours. Follow the steps below for immediate resolution.
 
-### Step 2: Update .env.local
+## Resolution Steps
 
-```bash
-cd frontend
+### Step 1: Obtain Fresh API Key
 
-# Create or edit .env.local
-nano .env.local
+1. Navigate to [Riot Developer Portal](https://developer.riotgames.com/)
+2. Authenticate with your Riot account credentials
+3. Locate the "REGENERATE API KEY" button
+4. Copy the newly generated key (format: `RGAPI-...`)
+
+### Step 2: Update Environment Configuration
+
+**Windows (PowerShell):**
+```powershell
+cd I:\MyProjects\league-ai-coach\frontend
+
+@"
+RIOT_API_KEY=RGAPI-your-key-here
+"@ | Out-File -FilePath .env.local -Encoding UTF8 -Force
 ```
 
-Paste this:
-```env
-RIOT_API_KEY=RGAPI-paste-your-key-here
+**macOS/Linux:**
+```bash
+cd /path/to/league-ai-coach/frontend
+
+echo "RIOT_API_KEY=RGAPI-your-key-here" > .env.local
 ```
 
-Save and exit (Ctrl+O, Enter, Ctrl+X)
+### Step 3: Clear Build Cache
 
-### Step 3: Restart Server
+**Windows (PowerShell):**
+```powershell
+Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue
+```
 
+**macOS/Linux:**
 ```bash
-# Kill current server (Ctrl+C)
-
-# Clear cache
 rm -rf .next
+```
 
-# Restart
+### Step 4: Restart Development Server
+
+```bash
 npm run dev
 ```
 
-### Step 4: Test
+### Step 5: Verify Functionality
 
-Go to: http://localhost:3000
-
-Try searching:
-- **Name:** `Faker`
-- **Tag:** `T1`
-- **Region:** `Korea (kr)`
-
-Click Search → Should work! ✅
-
----
-
-## 👀 Verification
-
-**Browser console should show:**
-```
-🔍 Searching player: Faker T1 kr
-✅ Player found: {gameName: "Faker", ...}
-```
-
-**Terminal should show:**
-```
-🔍 API Route - Search params: {gameName: 'Faker', ...}
-🔑 API Key present: true
-📊 Account response status: 200
-✅ Success! Returning player data
-```
-
----
-
-## 🐞 Still Not Working?
-
-### Error: "Invalid or expired API key"
-➡️ Your key is still old. Repeat Step 1-3.
-
-### Error: "Player not found. Check spelling"
-➡️ Try these **verified** players:
+Test with known players:
 
 **Europe West (euw1):**
-- `Caps` + `G2`
-- `Rekkles` + `G2`
+- Name: `Caps` | Tag: `G2`
 
 **Korea (kr):**
-- `Faker` + `T1`
-- `Zeus` + `T1`
+- Name: `Faker` | Tag: `T1`
 
 **North America (na1):**
-- `Doublelift` + `NA1`
+- Name: `Doublelift` | Tag: `NA1`
 
-### Error: "RIOT_API_KEY not configured"
-➡️ Check file name is exactly `.env.local` (not `.env.local.txt`)
+## Verification
 
-```bash
-# Check if file exists:
-ls -la frontend/.env.local
+### Browser Console Output
 
-# Should show: .env.local
+Expected console output on successful search:
+
+```javascript
+Searching player: Faker T1 kr
+Player found: {gameName: "Faker", tier: "CHALLENGER", ...}
 ```
 
-### Still stuck?
-➡️ Read full guide: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+### Server Console Output
+
+Expected server logs:
+
+```
+Player stats request: {puuid: '...', region: 'kr'}
+Player stats loaded successfully
+```
+
+## Additional Troubleshooting
+
+### "Invalid or expired API key"
+
+Repeat Step 1-3. Ensure complete key is copied without truncation.
+
+### "RIOT_API_KEY not configured"
+
+Verify file is named exactly `.env.local` (not `.env.local.txt`).
+
+```bash
+# Verify file existence
+ls -la .env.local
+
+# Check file contents
+cat .env.local
+```
+
+### Player Still Not Found
+
+Verify player exists on specified region. Use [u.gg](https://u.gg/) or [op.gg](https://op.gg/) to confirm.
+
+## API Key Management
+
+Development API keys expire every 24 hours and require daily renewal. For production deployments, apply for a Production API Key through the Riot Developer Portal, which does not expire.
+
+## Recent Updates
+
+The following commits address the player search functionality:
+
+- [682707a](https://github.com/haz33u/league-ai-coach/commit/682707a) - Added `/api/player` endpoint
+- [5a8d514](https://github.com/haz33u/league-ai-coach/commit/5a8d514) - Updated `getPlayerStats` implementation
+- [a932ee0](https://github.com/haz33u/league-ai-coach/commit/a932ee0) - Enhanced logo visibility
+
+## Support Resources
+
+- [Complete Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+- [Riot API Documentation](https://developer.riotgames.com/apis)
+- [Project README](README.md)
 
 ---
 
-## 💡 Why This Happens
-
-**Riot Development API keys expire every 24 hours.**
-
-You need to:
-1. Get new key daily from developer portal
-2. Update `.env.local`
-3. Restart server
-
-**For production:** Apply for Production API key (never expires)
-
----
-
-## 🛠️ What We Fixed
-
-**Commits:**
-- ✅ Added Next.js API Route (`frontend/app/api/search/route.ts`) [commit f4474ac](https://github.com/haz33u/league-ai-coach/commit/f4474ac)
-- ✅ Updated `lib/api.ts` to use API route [commit 0fe4c44](https://github.com/haz33u/league-ai-coach/commit/0fe4c44)
-- ✅ Added `.env.example` template [commit 2cdb6e9](https://github.com/haz33u/league-ai-coach/commit/2cdb6e9)
-
-**Changes:**
-- ❌ Before: Browser → Riot API directly (CORS error)
-- ✅ After: Browser → Next.js API Route → Riot API (works!)
-
----
-
-**Time to fix:** ~5 minutes  
-**Difficulty:** Easy  
-**Success rate:** 99%
-
-✅ **Done!** Player search should now work perfectly.
+**Resolution Time:** 5 minutes  
+**Success Rate:** 99%  
+**Last Updated:** January 31, 2026
