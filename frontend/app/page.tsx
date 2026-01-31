@@ -32,7 +32,9 @@ export default function Home() {
         region
       );
       
-      router.push(`/player/${data.puuid}?region=${region}`);
+      const urlName = encodeURIComponent(data.gameName);
+      const urlTag = encodeURIComponent(data.tagLine);
+      router.push(`/player/${data.puuid}?region=${region}&name=${urlName}&tag=${urlTag}`);
       
     } catch (err: any) {
       setError(err.message || 'Player not found');
@@ -54,14 +56,12 @@ export default function Home() {
       <main className={styles.main}>
         <div className={styles.container}>
           
-          {/* GRADIENT LOGO */}
           <div className={styles.heroLogo}>
             <div className={styles.logoCircle}>
               <Logo />
             </div>
           </div>
 
-          {/* GRADIENT TITLE */}
           <div className={styles.header}>
             <h1 className={styles.title}>
               <span className={styles.gradientText}>Nexus Oracle</span>
@@ -70,7 +70,6 @@ export default function Home() {
             <p className={styles.description}>Real-time player statistics powered by Riot API</p>
           </div>
 
-          {/* SEARCH CARD - НЕ ТРОГАЮ! */}
           <div className={styles.searchCard}>
             <form onSubmit={handleSearch} className={styles.searchForm}>
               <div className={styles.inputsGrid}>
@@ -123,7 +122,6 @@ export default function Home() {
             </form>
           </div>
 
-          {/* EXAMPLES */}
           <div className={styles.examples}>
             <p className={styles.examplesLabel}>Popular Players</p>
             <div className={styles.exampleButtons}>
@@ -148,7 +146,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* FEATURES */}
           <div className={styles.features}>
             <div className={styles.featureCard}>
               <div className={styles.featureIcon}>📊</div>
