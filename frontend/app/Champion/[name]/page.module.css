@@ -1,0 +1,191 @@
+.main {
+  min-height: 100vh;
+  padding: 100px 20px 60px;
+  background: #ffffff;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.loading, .error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e5ea;
+  border-top-color: #0071e3;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.backLink {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: #0071e3;
+  color: #fff;
+  border-radius: 980px;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.header {
+  margin-bottom: 60px;
+  text-align: center;
+  animation: slideUp 0.6s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.championName {
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -2px;
+  color: #1d1d1d;
+  margin: 0 0 8px 0;
+}
+
+.championTitle {
+  font-size: 20px;
+  color: #565656;
+  margin: 0 0 20px 0;
+}
+
+.tierBadge {
+  display: inline-block;
+  padding: 8px 24px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #1d1d1d;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: 980px;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.statCard {
+  padding: 40px;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  animation: cardSlideIn 0.5s ease-out forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes cardSlideIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.statCard.green {
+  background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+}
+
+.statCard.green:hover {
+  background: linear-gradient(135deg, #c6f6d5 0%, #dcfce7 100%);
+  border-color: #22c55e;
+  box-shadow: 0 20px 40px rgba(34, 197, 94, 0.15);
+  transform: translateY(-2px);
+}
+
+.statCard.blue {
+  background: linear-gradient(135deg, #e8f0ff 0%, #f0f4ff 100%);
+}
+
+.statCard.blue:hover {
+  background: linear-gradient(135deg, #dce8ff 0%, #e8f0ff 100%);
+  border-color: #0071e3;
+  box-shadow: 0 20px 40px rgba(0, 113, 227, 0.15);
+  transform: translateY(-2px);
+}
+
+.statCard.purple {
+  background: linear-gradient(135deg, #f3e8ff 0%, #f9f5ff 100%);
+}
+
+.statCard.purple:hover {
+  background: linear-gradient(135deg, #ede1ff 0%, #f3e8ff 100%);
+  border-color: #7c3aed;
+  box-shadow: 0 20px 40px rgba(124, 58, 237, 0.15);
+  transform: translateY(-2px);
+}
+
+.statCard.orange {
+  background: linear-gradient(135deg, #fed7aa 0%, #fef3c7 100%);
+}
+
+.statCard.orange:hover {
+  background: linear-gradient(135deg, #fdba74 0%, #fed7aa 100%);
+  border-color: #f97316;
+  box-shadow: 0 20px 40px rgba(249, 115, 22, 0.15);
+  transform: translateY(-2px);
+}
+
+.cardInner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+}
+
+.cardContent {
+  text-align: center;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #565656;
+  margin: 0 0 12px 0;
+}
+
+.value {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  color: #1d1d1d;
+  margin: 0 0 8px 0;
+}
+
+.subtext {
+  font-size: 14px;
+  color: #565656;
+  margin: 0;
+}

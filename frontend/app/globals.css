@@ -10,7 +10,7 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'SF Pro Display', 'SF Pro Text', 'Roboto', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'SF Pro Display', 'SF Pro Text', 'Roboto', sans-serif; 
   font-size: 16px;
   line-height: 1.6;
   background: #ffffff;
@@ -512,3 +512,10 @@ body::before {
 .champion-Zilean { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zilean.png'); }
 .champion-Zoe { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zoe.png'); }
 .champion-Zyra { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zyra.png'); }
+:root {
+  --apple-gray: #f8f9fa;
+  --apple-black: #000;
+  --apple-white: #fff;
+  --border-radius: 8px;
+  --font-size: 16px;
+}

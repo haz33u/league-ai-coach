@@ -1,37 +1,33 @@
 // Riot Games API configuration
 const RIOT_API_KEY = process.env.NEXT_PUBLIC_RIOT_API_KEY || 'RGAPI-YOUR-KEY-HERE';
-const BASE_URL_AMERICAS = 'https://americas.api.riotgames.com';
-const BASE_URL_EUROPE = 'https://europe.api.riotgames.com';
-const BASE_URL_ASIA = 'https://asia.api.riotgames.com';
 
-// Regional endpoints
+// Regional routing endpoints
 const REGIONAL_ENDPOINTS: Record<string, string> = {
-  'na1': BASE_URL_AMERICAS,
-  'br1': BASE_URL_AMERICAS,
-  'la1': BASE_URL_AMERICAS,
-  'la2': BASE_URL_AMERICAS,
-  'euw1': BASE_URL_EUROPE,
-  'eun1': BASE_URL_EUROPE,
-  'tr1': BASE_URL_EUROPE,
-  'ru': BASE_URL_EUROPE,
-  'kr': BASE_URL_ASIA,
-  'jp1': BASE_URL_ASIA,
+  'euw1': 'https://europe.api.riotgames.com',
+  'eun1': 'https://europe.api.riotgames.com',
+  'tr1': 'https://europe.api.riotgames.com',
+  'ru': 'https://europe.api.riotgames.com',
+  'na1': 'https://americas.api.riotgames.com',
+  'br1': 'https://americas.api.riotgames.com',
+  'la1': 'https://americas.api.riotgames.com',
+  'la2': 'https://americas.api.riotgames.com',
+  'kr': 'https://asia.api.riotgames.com',
+  'jp1': 'https://asia.api.riotgames.com',
 };
 
+// Platform endpoints
 const PLATFORM_ENDPOINTS: Record<string, string> = {
-  'na1': 'https://na1.api.riotgames.com',
-  'br1': 'https://br1.api.riotgames.com',
-  'la1': 'https://la1.api.riotgames.com',
-  'la2': 'https://la2.api.riotgames.com',
   'euw1': 'https://euw1.api.riotgames.com',
   'eun1': 'https://eun1.api.riotgames.com',
   'tr1': 'https://tr1.api.riotgames.com',
   'ru': 'https://ru.api.riotgames.com',
+  'na1': 'https://na1.api.riotgames.com',
+  'br1': 'https://br1.api.riotgames.com',
+  'la1': 'https://la1.api.riotgames.com',
+  'la2': 'https://la2.api.riotgames.com',
   'kr': 'https://kr.api.riotgames.com',
   'jp1': 'https://jp1.api.riotgames.com',
 };
-
-// ==================== TYPES ====================
 
 export interface PlayerStats {
   gameName: string;
@@ -65,8 +61,6 @@ export interface MatchHistory {
   kda: number;
 }
 
-// ==================== HELPER FUNCTIONS ====================
-
 function calculateTimeAgo(timestamp: number): string {
   const now = Date.now();
   const diff = now - timestamp;
@@ -75,8 +69,8 @@ function calculateTimeAgo(timestamp: number): string {
   const days = Math.floor(diff / 86400000);
 
   if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours}h ago`;
   if (days === 1) return 'Yesterday';
   return `${days} days ago`;
 }
@@ -87,157 +81,120 @@ function formatGameDuration(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-// ==================== API FUNCTIONS ====================
-
 export async function searchPlayer(
   gameName: string,
   tagLine: string,
   region: string = 'euw1'
 ): Promise<PlayerStats> {
   try {
-    console.log('🔍 Searching for player:', gameName, tagLine, region);
+    const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
+    const platformUrl = PLATFORM_ENDPOINTS[region] || PLATFORM_ENDPOINTS['euw1'];
 
-    // 1. Get Account (PUUID) from REGIONAL endpoint
-    const regionalUrl = REGIONAL_ENDPOINTS[region.toLowerCase()] || BASE_URL_EUROPE;
+    console.log('🔍 Search:', gameName, tagLine, region);
+
+    // 1. Get Account
     const accountUrl = `${regionalUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-    
-    console.log('📡 Account URL:', accountUrl);
-
-    const accountResponse = await fetch(accountUrl, {
-      headers: { 
-        'X-Riot-Token': RIOT_API_KEY,
-      },
+    const accountRes = await fetch(accountUrl, {
+      headers: { 'X-Riot-Token': RIOT_API_KEY },
     });
 
-    if (!accountResponse.ok) {
-      const errorText = await accountResponse.text();
-      console.error('❌ Account Error:', accountResponse.status, errorText);
+    if (!accountRes.ok) {
       throw new Error('Player not found');
     }
 
-    const account = await accountResponse.json();
-    console.log('✅ Account found:', account);
+    const account = await accountRes.json();
     const puuid = account.puuid;
 
-    // 2. Get Summoner Data from PLATFORM endpoint
-    const platformUrl = PLATFORM_ENDPOINTS[region.toLowerCase()] || 'https://euw1.api.riotgames.com';
-    const summonerUrl = `${platformUrl}/lol/summoner/v4/summoners/by-puuid/${puuid}`;
-    
-    console.log('📡 Summoner URL:', summonerUrl);
+    // 2. Get Summoner
+    const summonerRes = await fetch(
+      `${platformUrl}/lol/summoner/v4/summoners/by-puuid/${puuid}`,
+      { headers: { 'X-Riot-Token': RIOT_API_KEY } }
+    );
 
-    const summonerResponse = await fetch(summonerUrl, {
-      headers: { 'X-Riot-Token': RIOT_API_KEY },
-    });
+    if (!summonerRes.ok) throw new Error('Summoner not found');
+    const summoner = await summonerRes.json();
 
-    if (!summonerResponse.ok) {
-      console.error('❌ Summoner Error:', summonerResponse.status);
-      throw new Error('Could not fetch summoner data');
-    }
+    // 3. Get League
+    const leagueRes = await fetch(
+      `${platformUrl}/lol/league/v4/entries/by-summoner/${summoner.id}`,
+      { headers: { 'X-Riot-Token': RIOT_API_KEY } }
+    );
 
-    const summoner = await summonerResponse.json();
-    console.log('✅ Summoner found:', summoner);
+    const league = await leagueRes.json();
+    const ranked = league.find((e: any) => e.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
 
-    // 3. Get Ranked Data
-    const leagueUrl = `${platformUrl}/lol/league/v4/entries/by-summoner/${summoner.id}`;
-    console.log('📡 League URL:', leagueUrl);
+    const totalGames = (ranked?.wins || 0) + (ranked?.losses || 0);
+    const winRate = totalGames > 0 ? (ranked.wins / totalGames) * 100 : 0;
 
-    const leagueResponse = await fetch(leagueUrl, {
-      headers: { 'X-Riot-Token': RIOT_API_KEY },
-    });
-
-    if (!leagueResponse.ok) {
-      console.error('❌ League Error:', leagueResponse.status);
-      throw new Error('Could not fetch league data');
-    }
-
-    const league = await leagueResponse.json();
-    console.log('✅ League data:', league);
-
-    const rankedData = league.find((entry: any) => entry.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
-
-    const totalGames = (rankedData?.wins || 0) + (rankedData?.losses || 0);
-    const winRate = totalGames > 0 ? ((rankedData.wins / totalGames) * 100) : 0;
-
-    // 4. Get Match History for KDA & Main Champion
-    const matchesUrl = `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=20`;
-    console.log('📡 Matches URL:', matchesUrl);
-
+    // 4. Get Matches
     let kda = 0;
     let mainChampion = 'Unknown';
     let mainRole = 'Unknown';
 
     try {
-      const matchesResponse = await fetch(matchesUrl, {
-        headers: { 'X-Riot-Token': RIOT_API_KEY },
-      });
+      const matchesRes = await fetch(
+        `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`,
+        { headers: { 'X-Riot-Token': RIOT_API_KEY } }
+      );
 
-      if (matchesResponse.ok) {
-        const matchIds = await matchesResponse.json();
-        console.log('✅ Found matches:', matchIds.length);
+      if (matchesRes.ok) {
+        const matchIds = await matchesRes.json();
         
         if (matchIds.length > 0) {
-          const matchPromises = matchIds.slice(0, 10).map((matchId: string) =>
-            fetch(`${regionalUrl}/lol/match/v5/matches/${matchId}`, {
-              headers: { 'X-Riot-Token': RIOT_API_KEY },
-            })
-            .then(res => res.ok ? res.json() : null)
-            .catch(() => null)
+          const matches = await Promise.all(
+            matchIds.slice(0, 5).map((id: string) =>
+              fetch(`${regionalUrl}/lol/match/v5/matches/${id}`, {
+                headers: { 'X-Riot-Token': RIOT_API_KEY },
+              })
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+            )
           );
 
-          const matches = (await Promise.all(matchPromises)).filter(m => m !== null);
-          console.log('✅ Loaded match details:', matches.length);
+          const validMatches = matches.filter(m => m !== null);
           
-          let totalKills = 0;
-          let totalDeaths = 0;
-          let totalAssists = 0;
-          const championCounts: Record<string, number> = {};
+          let totalK = 0, totalD = 0, totalA = 0;
+          const champCounts: Record<string, number> = {};
           const roleCounts: Record<string, number> = {};
 
-          matches.forEach((match: any) => {
-            const participant = match.info.participants.find((p: any) => p.puuid === puuid);
-            if (participant) {
-              totalKills += participant.kills;
-              totalDeaths += participant.deaths;
-              totalAssists += participant.assists;
-              
-              championCounts[participant.championName] = (championCounts[participant.championName] || 0) + 1;
-              
-              const role = participant.teamPosition || participant.individualPosition || 'UTILITY';
+          validMatches.forEach((match: any) => {
+            const p = match.info.participants.find((x: any) => x.puuid === puuid);
+            if (p) {
+              totalK += p.kills;
+              totalD += p.deaths;
+              totalA += p.assists;
+              champCounts[p.championName] = (champCounts[p.championName] || 0) + 1;
+              const role = p.teamPosition || 'UTILITY';
               roleCounts[role] = (roleCounts[role] || 0) + 1;
             }
           });
 
-          kda = totalDeaths > 0 ? (totalKills + totalAssists) / totalDeaths : (totalKills + totalAssists);
-          mainChampion = Object.entries(championCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
+          kda = totalD > 0 ? (totalK + totalA) / totalD : (totalK + totalA);
+          mainChampion = Object.entries(champCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
           
           const roleMap: Record<string, string> = {
-            'TOP': 'Top',
-            'JUNGLE': 'Jungle',
-            'MIDDLE': 'Mid',
-            'BOTTOM': 'ADC',
-            'UTILITY': 'Support'
+            'TOP': 'Top', 'JUNGLE': 'Jungle', 'MIDDLE': 'Mid',
+            'BOTTOM': 'ADC', 'UTILITY': 'Support'
           };
           const mainRoleKey = Object.entries(roleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'UTILITY';
           mainRole = roleMap[mainRoleKey] || 'Unknown';
-
-          console.log('📊 KDA:', kda.toFixed(2), 'Main Champion:', mainChampion, 'Main Role:', mainRole);
         }
       }
-    } catch (matchError) {
-      console.warn('⚠️ Could not load match history:', matchError);
+    } catch (e) {
+      console.warn('Match history error:', e);
     }
 
-    const playerStats: PlayerStats = {
+    return {
       gameName: account.gameName,
       tagLine: account.tagLine,
       summonerId: summoner.id,
       puuid,
       level: summoner.summonerLevel,
-      tier: rankedData?.tier || 'UNRANKED',
-      rank: rankedData?.rank || '',
-      leaguePoints: rankedData?.leaguePoints || 0,
-      wins: rankedData?.wins || 0,
-      losses: rankedData?.losses || 0,
+      tier: ranked?.tier || 'UNRANKED',
+      rank: ranked?.rank || '',
+      leaguePoints: ranked?.leaguePoints || 0,
+      wins: ranked?.wins || 0,
+      losses: ranked?.losses || 0,
       winRate,
       totalGames,
       kda,
@@ -245,81 +202,77 @@ export async function searchPlayer(
       mainChampion,
       recentForm: winRate,
     };
-
-    console.log('✅ Final player stats:', playerStats);
-    return playerStats;
   } catch (error) {
-    console.error('❌ API Error:', error);
+    console.error('Search error:', error);
     throw error;
   }
 }
 
 export async function getPlayerStats(puuid: string, region: string = 'euw1'): Promise<PlayerStats> {
+  const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
+  const platformUrl = PLATFORM_ENDPOINTS[region] || PLATFORM_ENDPOINTS['euw1'];
+
+  const summonerRes = await fetch(
+    `${platformUrl}/lol/summoner/v4/summoners/by-puuid/${puuid}`,
+    { headers: { 'X-Riot-Token': RIOT_API_KEY } }
+  );
+
+  if (!summonerRes.ok) throw new Error('Player not found');
+  const summoner = await summonerRes.json();
+
+  const leagueRes = await fetch(
+    `${platformUrl}/lol/league/v4/entries/by-summoner/${summoner.id}`,
+    { headers: { 'X-Riot-Token': RIOT_API_KEY } }
+  );
+
+  const league = await leagueRes.json();
+  const ranked = league.find((e: any) => e.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
+
+  const totalGames = (ranked?.wins || 0) + (ranked?.losses || 0);
+  const winRate = totalGames > 0 ? (ranked.wins / totalGames) * 100 : 0;
+
+  let kda = 0, mainChampion = 'Unknown', mainRole = 'Unknown';
+
   try {
-    const platformUrl = PLATFORM_ENDPOINTS[region.toLowerCase()] || 'https://euw1.api.riotgames.com';
-    const regionalUrl = REGIONAL_ENDPOINTS[region.toLowerCase()] || BASE_URL_EUROPE;
-
-    const summonerResponse = await fetch(
-      `${platformUrl}/lol/summoner/v4/summoners/by-puuid/${puuid}`,
-      { headers: { 'X-Riot-Token': RIOT_API_KEY } }
-    );
-
-    if (!summonerResponse.ok) throw new Error('Player not found');
-
-    const summoner = await summonerResponse.json();
-
-    const leagueResponse = await fetch(
-      `${platformUrl}/lol/league/v4/entries/by-summoner/${summoner.id}`,
-      { headers: { 'X-Riot-Token': RIOT_API_KEY } }
-    );
-
-    const league = await leagueResponse.json();
-    const rankedData = league.find((entry: any) => entry.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
-
-    const totalGames = (rankedData?.wins || 0) + (rankedData?.losses || 0);
-    const winRate = totalGames > 0 ? ((rankedData.wins / totalGames) * 100) : 0;
-
-    let kda = 0;
-    let mainChampion = 'Unknown';
-    let mainRole = 'Unknown';
-
-    const matchesResponse = await fetch(
+    const matchesRes = await fetch(
       `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`,
       { headers: { 'X-Riot-Token': RIOT_API_KEY } }
     );
 
-    if (matchesResponse.ok) {
-      const matchIds = await matchesResponse.json();
+    if (matchesRes.ok) {
+      const matchIds = await matchesRes.json();
       
       if (matchIds.length > 0) {
-        const matchPromises = matchIds.slice(0, 10).map((matchId: string) =>
-          fetch(`${regionalUrl}/lol/match/v5/matches/${matchId}`, {
-            headers: { 'X-Riot-Token': RIOT_API_KEY },
-          })
-          .then(res => res.ok ? res.json() : null)
-          .catch(() => null)
+        const matches = await Promise.all(
+          matchIds.slice(0, 5).map((id: string) =>
+            fetch(`${regionalUrl}/lol/match/v5/matches/${id}`, {
+              headers: { 'X-Riot-Token': RIOT_API_KEY },
+            })
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null)
+          )
         );
 
-        const matches = (await Promise.all(matchPromises)).filter(m => m !== null);
+        const validMatches = matches.filter(m => m !== null);
         
-        let totalKills = 0, totalDeaths = 0, totalAssists = 0;
-        const championCounts: Record<string, number> = {};
+        let totalK = 0, totalD = 0, totalA = 0;
+        const champCounts: Record<string, number> = {};
         const roleCounts: Record<string, number> = {};
 
-        matches.forEach((match: any) => {
-          const participant = match.info.participants.find((p: any) => p.puuid === puuid);
-          if (participant) {
-            totalKills += participant.kills;
-            totalDeaths += participant.deaths;
-            totalAssists += participant.assists;
-            championCounts[participant.championName] = (championCounts[participant.championName] || 0) + 1;
-            const role = participant.teamPosition || 'UTILITY';
+        validMatches.forEach((match: any) => {
+          const p = match.info.participants.find((x: any) => x.puuid === puuid);
+          if (p) {
+            totalK += p.kills;
+            totalD += p.deaths;
+            totalA += p.assists;
+            champCounts[p.championName] = (champCounts[p.championName] || 0) + 1;
+            const role = p.teamPosition || 'UTILITY';
             roleCounts[role] = (roleCounts[role] || 0) + 1;
           }
         });
 
-        kda = totalDeaths > 0 ? (totalKills + totalAssists) / totalDeaths : (totalKills + totalAssists);
-        mainChampion = Object.entries(championCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
+        kda = totalD > 0 ? (totalK + totalA) / totalD : (totalK + totalA);
+        mainChampion = Object.entries(champCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
         
         const roleMap: Record<string, string> = {
           'TOP': 'Top', 'JUNGLE': 'Jungle', 'MIDDLE': 'Mid',
@@ -329,67 +282,64 @@ export async function getPlayerStats(puuid: string, region: string = 'euw1'): Pr
         mainRole = roleMap[mainRoleKey] || 'Unknown';
       }
     }
-
-    return {
-      gameName: 'Unknown',
-      tagLine: 'NA1',
-      summonerId: summoner.id,
-      puuid,
-      level: summoner.summonerLevel,
-      tier: rankedData?.tier || 'UNRANKED',
-      rank: rankedData?.rank || '',
-      leaguePoints: rankedData?.leaguePoints || 0,
-      wins: rankedData?.wins || 0,
-      losses: rankedData?.losses || 0,
-      winRate,
-      totalGames,
-      kda,
-      mainRole,
-      mainChampion,
-      recentForm: winRate,
-    };
-  } catch (error) {
-    console.error('API Error:', error);
-    throw error;
+  } catch (e) {
+    console.warn('Match error:', e);
   }
+
+  return {
+    gameName: 'Unknown',
+    tagLine: 'NA1',
+    summonerId: summoner.id,
+    puuid,
+    level: summoner.summonerLevel,
+    tier: ranked?.tier || 'UNRANKED',
+    rank: ranked?.rank || '',
+    leaguePoints: ranked?.leaguePoints || 0,
+    wins: ranked?.wins || 0,
+    losses: ranked?.losses || 0,
+    winRate,
+    totalGames,
+    kda,
+    mainRole,
+    mainChampion,
+    recentForm: winRate,
+  };
 }
 
 export async function getMatchHistory(puuid: string, region: string = 'euw1'): Promise<MatchHistory[]> {
-  try {
-    const regionalUrl = REGIONAL_ENDPOINTS[region.toLowerCase()] || BASE_URL_EUROPE;
+  const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
 
-    const matchesResponse = await fetch(
+  try {
+    const matchesRes = await fetch(
       `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`,
       { headers: { 'X-Riot-Token': RIOT_API_KEY } }
     );
 
-    if (!matchesResponse.ok) return [];
+    if (!matchesRes.ok) return [];
 
-    const matchIds = await matchesResponse.json();
+    const matchIds = await matchesRes.json();
     
-    const matchPromises = matchIds.map((matchId: string) =>
-      fetch(`${regionalUrl}/lol/match/v5/matches/${matchId}`, {
-        headers: { 'X-Riot-Token': RIOT_API_KEY },
-      })
-      .then(res => res.ok ? res.json() : null)
-      .catch(() => null)
+    const matches = await Promise.all(
+      matchIds.map((id: string) =>
+        fetch(`${regionalUrl}/lol/match/v5/matches/${id}`, {
+          headers: { 'X-Riot-Token': RIOT_API_KEY },
+        })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+      )
     );
 
-    const matches = (await Promise.all(matchPromises)).filter(m => m !== null);
-    
-    return matches.map((match: any) => {
-      const participant = match.info.participants.find((p: any) => p.puuid === puuid);
-      const kda = participant.deaths > 0 
-        ? (participant.kills + participant.assists) / participant.deaths 
-        : (participant.kills + participant.assists);
+    return matches.filter(m => m !== null).map((match: any) => {
+      const p = match.info.participants.find((x: any) => x.puuid === puuid);
+      const kda = p.deaths > 0 ? (p.kills + p.assists) / p.deaths : (p.kills + p.assists);
       
       return {
         matchId: match.metadata.matchId,
-        champion: participant.championName,
-        kills: participant.kills,
-        deaths: participant.deaths,
-        assists: participant.assists,
-        win: participant.win,
+        champion: p.championName,
+        kills: p.kills,
+        deaths: p.deaths,
+        assists: p.assists,
+        win: p.win,
         duration: formatGameDuration(match.info.gameDuration),
         ago: calculateTimeAgo(match.info.gameEndTimestamp),
         mode: match.info.queueId === 420 ? 'Ranked Solo/Duo' : 'Normal',
@@ -397,15 +347,13 @@ export async function getMatchHistory(puuid: string, region: string = 'euw1'): P
       };
     });
   } catch (error) {
-    console.error('Match History Error:', error);
+    console.error('Match history error:', error);
     return [];
   }
 }
 
 export function formatRank(tier: string, rank: string): string {
   if (tier === 'UNRANKED') return 'Unranked';
-  if (tier === 'CHALLENGER') return 'Challenger';
-  if (tier === 'GRANDMASTER') return 'Grandmaster';
-  if (tier === 'MASTER') return 'Master';
-  return `${tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase()} ${rank}`;
+  if (tier === 'CHALLENGER' || tier === 'GRANDMASTER' || tier === 'MASTER') return tier.charAt(0) + tier.slice(1).toLowerCase();
+  return `${tier.charAt(0) + tier.slice(1).toLowerCase()} ${rank}`;
 }
