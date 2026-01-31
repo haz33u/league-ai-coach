@@ -1,216 +1,196 @@
-# 🔮 Nexus Oracle
+# Nexus Oracle
 
-**League of Legends Analytics Platform** with real-time player statistics powered by Riot Games API.
+> Real-time League of Legends analytics platform powered by Riot Games API
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)
-![Riot API](https://img.shields.io/badge/Riot_API-v5-red?style=flat-square)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Riot API](https://img.shields.io/badge/Riot_API-v5-red?style=flat-square)](https://developer.riotgames.com/)
 
-## ✨ Features
+## Overview
 
-- 🔍 **Real-time Player Search** - 10 regions (EUW, NA, KR, etc.)
-- 🎯 **Live Statistics** - Rank, LP, Winrate, KDA from Riot API v4/v5
-- 📊 **Match History** - Last 10 games with detailed analytics
-- 🎨 **Official Assets** - League icons from Community Dragon
-- 📱 **Responsive Design** - Glassmorphism UI with gradient animations
-- ⚡ **Next.js API Routes** - Server-side proxy (no CORS issues)
+Nexus Oracle provides comprehensive player statistics and match analysis for League of Legends, utilizing official Riot Games API endpoints to deliver accurate, real-time data across all major regions.
 
-## 🚀 Quick Start
+### Key Features
+
+- **Live Player Search** — Query players across 10 regions with instant results
+- **Real-time Statistics** — Current rank, LP, win rate, and KDA calculations
+- **Match History** — Detailed breakdown of recent games with performance metrics
+- **Regional Support** — EUW, NA, KR, and 7 additional regions
+- **Modern Architecture** — Built with Next.js 14 App Router and TypeScript
+- **API Security** — Server-side routing eliminates CORS issues and protects API keys
+
+## Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- Riot Games Developer Account
+
+- Node.js 18.x or higher
+- Riot Games Developer Account ([Register here](https://developer.riotgames.com/))
 
 ### Installation
 
 ```bash
-# 1. Clone repository
+# Clone repository
 git clone https://github.com/haz33u/league-ai-coach.git
 cd league-ai-coach/frontend
 
-# 2. Install dependencies
+# Install dependencies
 npm install
 
-# 3. Setup environment
+# Configure environment
 cp .env.example .env.local
 ```
 
-### Get Riot API Key
+### API Configuration
 
-1. Go to [Riot Developer Portal](https://developer.riotgames.com/)
-2. Log in with your Riot account
-3. Copy your **Development API Key**
-4. Add to `.env.local`:
+1. Navigate to [Riot Developer Portal](https://developer.riotgames.com/)
+2. Generate a Development API Key
+3. Add key to `.env.local`:
 
 ```env
 RIOT_API_KEY=RGAPI-your-key-here
 ```
 
-> ⚠️ **Important:** Development keys expire every 24 hours! Update daily.
+**Note:** Development keys expire after 24 hours and require daily renewal.
 
-### Run Development Server
+### Development Server
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Application will be available at `http://localhost:3000`
 
-## 🐞 Troubleshooting
+## Architecture
 
-### ❌ "Player not found" error?
-
-**Most common cause:** API key expired (refreshes every 24h)
-
-**Quick Fix:**
-```bash
-# 1. Get new key from developer.riotgames.com
-# 2. Update .env.local with new RIOT_API_KEY
-# 3. Restart server:
-rm -rf .next && npm run dev
-```
-
-**Other causes:**
-- Wrong player name/tag format (use `Name#TAG`)
-- Wrong region (Faker is on KR, not EUW)
-- Player doesn't exist on that region
-
-📝 **Full guide:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-
-## 📚 API Architecture
+### API Flow
 
 ```
-Browser → /api/search → Riot API
-         (Next.js)    (Server-side)
-         ✅ No CORS   ✅ API key secure
+Client → Next.js API Routes → Riot Games API
+         (Server-side)         (External)
 ```
 
-**Files:**
-- `frontend/app/api/search/route.ts` - API proxy endpoint
-- `frontend/lib/api.ts` - Client API functions
-- `frontend/app/page.tsx` - Search UI
-- `frontend/app/player/[puuid]/page.tsx` - Player profile
+This architecture provides:
+- Elimination of CORS restrictions
+- Secure API key storage
+- Request rate limiting capability
+- Response caching potential
 
-## 🔧 Tech Stack
+### Project Structure
+
+```
+frontend/
+├── app/
+│   ├── api/
+│   │   ├── search/route.ts      # Player search endpoint
+│   │   └── player/route.ts      # Player stats endpoint
+│   ├── player/[puuid]/page.tsx  # Player profile page
+│   └── page.tsx                 # Landing page
+├── lib/
+│   └── api.ts                   # API client functions
+└── components/
+    └── Logo.tsx                 # Brand logo component
+```
+
+## API Endpoints
+
+### Search Player
+
+```typescript
+GET /api/search?gameName={name}&tagLine={tag}&region={region}
+```
+
+Returns player account data, summoner info, and ranked statistics.
+
+### Player Stats
+
+```typescript
+GET /api/player?puuid={puuid}&region={region}
+```
+
+Retrieves comprehensive player statistics including match history analysis.
+
+## Technology Stack
 
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript 5
 - **Styling:** Tailwind CSS + CSS Modules
-- **API:** Riot Games API v5
-- **Deployment:** Vercel
+- **API Integration:** Riot Games API v5
+- **Deployment:** Vercel Platform
 
-## 🎮 Usage Examples
+## Troubleshooting
 
-### Search Players
+### Common Issues
 
-**Europe West:**
-- `Caps` + `G2`
-- `Rekkles` + `G2`
+**Player Not Found**
 
-**Korea:**
-- `Faker` + `T1`
-- `Zeus` + `T1`
-
-**North America:**
-- `Doublelift` + `NA1`
-
-## 🛣️ Roadmap
-
-- [ ] Match history UI improvements
-- [ ] Champion pages (builds, runes, winrates)
-- [ ] Live game spectator
-- [ ] Pro player leaderboard
-- [ ] Multi-language support
-- [ ] Dark/Light theme toggle
-
-## 📝 Project Structure
-
-```
-league-ai-coach/
-├── frontend/
-│   ├── app/
-│   │   ├── api/search/route.ts    # API proxy
-│   │   ├── page.tsx                # Home page
-│   │   ├── page.module.css         # Gradient design
-│   │   └── player/[puuid]/page.tsx # Player profile
-│   ├── lib/
-│   │   └── api.ts                  # API functions
-│   ├── components/
-│   │   └── Logo.tsx                # Animated logo
-│   ├── .env.example
-│   └── package.json
-├── docs/
-│   ├── TROUBLESHOOTING.md
-│   └── RIOT_DEVELOPER.txt
-└── README.md
-```
-
-## 🔑 Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `RIOT_API_KEY` | Server-side Riot API key | ✅ Yes |
-| `NEXT_PUBLIC_RIOT_API_KEY` | Client-side key (not recommended) | ❌ No |
-
-## 💫 Deployment
-
-### Vercel (Recommended)
+Most commonly caused by expired API key. Development keys require daily renewal.
 
 ```bash
-# 1. Install Vercel CLI
-npm i -g vercel
-
-# 2. Deploy
-cd frontend
-vercel
-
-# 3. Add environment variable in Vercel dashboard:
-# Settings → Environment Variables → RIOT_API_KEY
+# Solution
+1. Obtain new key from developer.riotgames.com
+2. Update .env.local
+3. Clear Next.js cache: rm -rf .next
+4. Restart development server
 ```
 
-### Production API Key
+**API Configuration Error**
 
-For production deployment:
-1. Go to [Riot Developer Portal](https://developer.riotgames.com/)
-2. Apply for **Production API Key**
-3. Wait for approval (can take days)
-4. Add to Vercel environment variables
+Verify `.env.local` exists and contains valid `RIOT_API_KEY` value.
 
-## 🐛 Known Issues
+Comprehensive troubleshooting guide: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
-- Development API keys expire every 24 hours
-- Rate limits: 20 requests/second (Development)
-- Some regions may have delayed data
+## Deployment
 
-## 🤝 Contributing
+### Vercel Deployment
 
-Contributions welcome! Please:
-1. Fork the repo
-2. Create feature branch (`git checkout -b feature/amazing`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing`)
-5. Open Pull Request
+```bash
+# Install Vercel CLI
+npm i -g vercel
 
-## 📜 License
+# Deploy
+cd frontend
+vercel
+```
 
-MIT License - see [LICENSE](LICENSE)
+Configure `RIOT_API_KEY` environment variable in Vercel dashboard.
 
-## 🚀 Credits
+For production use, apply for a Production API Key through the Riot Developer Portal.
 
-- **Riot Games API** - Player data
-- **Community Dragon** - League assets
-- **Next.js** - Framework
-- **Vercel** - Hosting
+## Development Roadmap
 
-## 📧 Support
+- [ ] Enhanced match history visualization
+- [ ] Champion-specific statistics pages
+- [ ] Live game spectator functionality
+- [ ] Regional leaderboards
+- [ ] Multi-language internationalization
+- [ ] Theme customization system
 
-- **Issues:** [GitHub Issues](https://github.com/haz33u/league-ai-coach/issues)
-- **Troubleshooting:** [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- **Riot API Docs:** [developer.riotgames.com](https://developer.riotgames.com/)
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/enhancement`)
+3. Commit changes (`git commit -m 'Add enhancement'`)
+4. Push to branch (`git push origin feature/enhancement`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License.
+
+## Resources
+
+- [Riot Games API Documentation](https://developer.riotgames.com/apis)
+- [API Status Dashboard](https://developer.riotgames.com/api-status)
+- [Community Dragon CDN](https://raw.communitydragon.org/)
+- [Next.js Documentation](https://nextjs.org/docs)
+
+## Acknowledgments
+
+Built with data provided by Riot Games API. This project is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties.
 
 ---
 
-**Made with ❤️ for the League community**
-
-**Riot Games API Status:** [API Status Page](https://developer.riotgames.com/api-status)  
-**Project Status:** 🟢 Active Development
+**Project Status:** Active Development  
+**Latest Update:** January 31, 2026
