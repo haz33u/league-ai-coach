@@ -28,6 +28,15 @@ const PLATFORM_ENDPOINTS: Record<string, string> = {
   'jp1': 'https://jp1.api.riotgames.com',
 };
 
+interface LeagueEntry {
+  queueType: string;
+  tier: string;
+  rank: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const puuid = searchParams.get('puuid');
@@ -86,14 +95,14 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    let ranked = {};
+    let ranked: Partial<LeagueEntry> = {};
     if (leagueRes.ok) {
-      const league = await leagueRes.json();
-      ranked = league.find((e: any) => e.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
+      const league: LeagueEntry[] = await leagueRes.json();
+      ranked = league.find((e) => e.queueType === 'RANKED_SOLO_5x5') || league[0] || {};
     }
 
-    const totalGames = (ranked?.wins || 0) + (ranked?.losses || 0);
-    const winRate = totalGames > 0 ? ((ranked.wins / totalGames) * 100) : 0;
+    const totalGames = (ranked.wins || 0) + (ranked.losses || 0);
+    const winRate = totalGames > 0 ? ((ranked.wins || 0) / totalGames * 100) : 0;
 
     // Step 3: Get Match History for KDA and main champion
     let kda = 0;
@@ -159,11 +168,11 @@ export async function GET(request: NextRequest) {
       puuid,
       summonerId: summoner.id,
       level: summoner.summonerLevel,
-      tier: ranked?.tier || 'UNRANKED',
-      rank: ranked?.rank || '',
-      leaguePoints: ranked?.leaguePoints || 0,
-      wins: ranked?.wins || 0,
-      losses: ranked?.losses || 0,
+      tier: ranked.tier || 'UNRANKED',
+      rank: ranked.rank || '',
+      leaguePoints: ranked.leaguePoints || 0,
+      wins: ranked.wins || 0,
+      losses: ranked.losses || 0,
       winRate,
       totalGames,
       kda,
