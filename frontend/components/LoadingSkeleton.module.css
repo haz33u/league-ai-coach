@@ -1,0 +1,70 @@
+.skeletonContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonCard {
+  background: var(--bg-glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  padding: 24px;
+  animation: shimmer 2s infinite;
+}
+
+.skeletonHeader {
+  height: 120px;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-tertiary) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  animation: shimmer 2s infinite;
+}
+
+.skeletonBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonText {
+  height: 16px;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-tertiary) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 2s infinite;
+}
+
+.skeletonAvatar {
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-tertiary) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.skeletonButton {
+  height: 44px;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-tertiary) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  animation: shimmer 2s infinite;
+}
+
+.skeletonInput {
+  height: 48px;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--bg-tertiary) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
