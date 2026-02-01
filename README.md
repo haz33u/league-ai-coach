@@ -200,4 +200,4 @@ MIT License - Free for personal and commercial use
 
 ---
 
-**Built with ⚡ by [Hazaev](https://github.com/haz33u)**
+**Built with ⚡ by [haz33u][Eugene Velial](https://github.com/haz33u)**
