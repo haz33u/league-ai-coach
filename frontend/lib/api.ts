@@ -1,237 +1,293 @@
-// API client for Nexus Oracle
-// Uses Next.js API Routes for secure server-side Riot API calls
+import { cache } from './cache';
+import { rateLimiter, RateLimitStats } from './rateLimit';
 
-const RIOT_API_KEY = process.env.RIOT_API_KEY || process.env.NEXT_PUBLIC_RIOT_API_KEY;
+const API_BASE = 'https://americas.api.riotgames.com';
 
-const REGIONAL_ENDPOINTS: Record<string, string> = {
-  'euw1': 'https://europe.api.riotgames.com',
-  'eun1': 'https://europe.api.riotgames.com',
-  'tr1': 'https://europe.api.riotgames.com',
-  'ru': 'https://europe.api.riotgames.com',
-  'na1': 'https://americas.api.riotgames.com',
-  'br1': 'https://americas.api.riotgames.com',
-  'la1': 'https://americas.api.riotgames.com',
-  'la2': 'https://americas.api.riotgames.com',
-  'kr': 'https://asia.api.riotgames.com',
-  'jp1': 'https://asia.api.riotgames.com',
-};
+export class RiotAPIError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number,
+    public data?: any
+  ) {
+    super(message);
+    this.name = 'RiotAPIError';
+  }
+}
 
-export interface PlayerStats {
+const pendingRequests = new Map<string, Promise<any>>();
+
+export interface PlayerSearchResult {
   gameName: string;
   tagLine: string;
-  summonerId: string;
   puuid: string;
-  level: number;
-  tier: string;
-  rank: string;
+  summonerId: string;
+  accountId: string;
+  name: string;
+  profileIconId: number;
+  summonerLevel: number;
+  revisionDate: number;
+}
+
+export interface LeagueEntry {
+  summonerId: string;
+  queueType: 'RANKED_SOLO_5x5' | 'RANKED_FLEX_SR' | 'RANKED_FLEX_TT';
+  tier: 'DIAMOND' | 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE' | 'IRON' | 'MASTER' | 'GRANDMASTER' | 'CHALLENGER';
+  rank: 'I' | 'II' | 'III' | 'IV';
   leaguePoints: number;
   wins: number;
   losses: number;
-  winRate: number;
-  totalGames: number;
-  kda: number;
-  mainRole: string;
-  mainChampion: string;
-  recentForm: number;
+  hotStreak: boolean;
+  veteran: boolean;
+  freshBlood: boolean;
+  inactive: boolean;
 }
 
-export interface MatchHistory {
-  matchId: string;
-  champion: string;
-  kills: number;
-  deaths: number;
-  assists: number;
-  win: boolean;
-  duration: string;
-  ago: string;
-  mode: string;
-  kda: number;
+interface RetryConfig {
+  maxRetries: number;
+  initialDelay: number;
+  maxDelay: number;
+  backoffMultiplier: number;
 }
 
-function calculateTimeAgo(timestamp: number): string {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  initialDelay: 1000,
+  maxDelay: 10000,
+  backoffMultiplier: 2,
+};
 
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days === 1) return 'Yesterday';
-  return `${days} days ago`;
+async function fetchWithRetry(
+  url: string,
+  options?: RequestInit,
+  retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG
+): Promise<Response> {
+  let lastError: Error | null = null;
+  let delay = retryConfig.initialDelay;
+
+  for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options?.headers || {}),
+        },
+      });
+
+      if (response.status === 404 || response.status === 403) {
+        throw new RiotAPIError(
+          `API Error: ${response.status}`,
+          response.status,
+          await response.json().catch(() => ({}))
+        );
+      }
+
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delay;
+        console.warn(`⏳ Rate limited. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+
+      if (response.status >= 500) {
+        if (attempt === retryConfig.maxRetries) {
+          throw new RiotAPIError(
+            `Server Error: ${response.status}`,
+            response.status
+          );
+        }
+        console.warn(`⚠️ Server error ${response.status}. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * retryConfig.backoffMultiplier, retryConfig.maxDelay);
+        continue;
+      }
+
+      if (!response.ok) {
+        throw new RiotAPIError(
+          `HTTP Error: ${response.status}`,
+          response.status
+        );
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+
+      if (error instanceof RiotAPIError && (error.statusCode === 404 || error.statusCode === 403)) {
+        throw error;
+      }
+
+      if (attempt < retryConfig.maxRetries) {
+        console.warn(
+          `❌ Attempt ${attempt + 1}/${retryConfig.maxRetries + 1} failed. Retrying in ${delay}ms...`,
+          error
+        );
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * retryConfig.backoffMultiplier, retryConfig.maxDelay);
+      }
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded');
 }
 
-function formatGameDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}m ${secs}s`;
+async function apiRequest<T>(
+  endpoint: string,
+  cacheKey?: string,
+  cacheTTL: number = 300
+): Promise<T> {
+  const apiKey = process.env.RIOT_API_KEY;
+  if (!apiKey) {
+    throw new Error('RIOT_API_KEY environment variable is not set');
+  }
+
+  if (cacheKey) {
+    const cached = cache.get<T>(cacheKey);
+    if (cached) return cached;
+  }
+
+  if (cacheKey && pendingRequests.has(cacheKey)) {
+    console.log(`📋 Deduplicating request for ${cacheKey}`);
+    return pendingRequests.get(cacheKey)!;
+  }
+
+  const requestPromise = (async () => {
+    try {
+      await rateLimiter.waitForSlot();
+
+      const url = `${API_BASE}${endpoint}?api_key=${apiKey}`;
+      const stats = rateLimiter.getStats();
+      console.log(`🌐 API Request: ${endpoint} (${stats.lastSecond}/${stats.limitSecond} req/s)`);
+
+      const response = await fetchWithRetry(url);
+      const data: T = await response.json();
+
+      if (cacheKey) {
+        cache.set(cacheKey, data, cacheTTL);
+      }
+
+      return data;
+    } finally {
+      if (cacheKey) {
+        pendingRequests.delete(cacheKey);
+      }
+    }
+  })();
+
+  if (cacheKey) {
+    pendingRequests.set(cacheKey, requestPromise);
+  }
+
+  return requestPromise;
 }
 
 export async function searchPlayer(
   gameName: string,
   tagLine: string,
   region: string = 'euw1'
-): Promise<PlayerStats> {
-  try {
-    console.log('Searching player:', gameName, tagLine, region);
+): Promise<{
+  data: PlayerSearchResult;
+  region: string;
+}> {
+  if (!gameName.trim() || !tagLine.trim()) {
+    throw new Error('Game name and tag line are required');
+  }
 
-    const response = await fetch(
-      `/api/search?gameName=${encodeURIComponent(gameName)}&tagLine=${encodeURIComponent(tagLine)}&region=${region}`
+  const cacheKey = `player:${gameName}:${tagLine}:${region}`;
+  
+  try {
+    const accountData = await apiRequest<{
+      gameName: string;
+      tagLine: string;
+      puuid: string;
+    }>(
+      `/riot/account/v1/accounts/by-game-name/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+      cacheKey,
+      600
     );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('API Route error:', errorData);
-      throw new Error(errorData.error || 'Player not found');
-    }
-
-    const data = await response.json();
-    console.log('Player found:', data);
-
-    const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
-    let kda = 0;
-    let mainChampion = 'Unknown';
-    let mainRole = 'Unknown';
-
-    try {
-      const matchesRes = await fetch(
-        `${regionalUrl}/lol/match/v5/matches/by-puuid/${data.puuid}/ids?start=0&count=10`,
-        { headers: { 'X-Riot-Token': RIOT_API_KEY || '' } }
-      );
-
-      if (matchesRes.ok) {
-        const matchIds = await matchesRes.json();
-        
-        if (matchIds.length > 0) {
-          const matches = await Promise.all(
-            matchIds.slice(0, 5).map((id: string) =>
-              fetch(`${regionalUrl}/lol/match/v5/matches/${id}`, {
-                headers: { 'X-Riot-Token': RIOT_API_KEY || '' },
-              })
-              .then(r => r.ok ? r.json() : null)
-              .catch(() => null)
-            )
-          );
-
-          const validMatches = matches.filter(m => m !== null);
-          
-          let totalK = 0, totalD = 0, totalA = 0;
-          const champCounts: Record<string, number> = {};
-          const roleCounts: Record<string, number> = {};
-
-          validMatches.forEach((match: any) => {
-            const p = match.info.participants.find((x: any) => x.puuid === data.puuid);
-            if (p) {
-              totalK += p.kills;
-              totalD += p.deaths;
-              totalA += p.assists;
-              champCounts[p.championName] = (champCounts[p.championName] || 0) + 1;
-              const role = p.teamPosition || 'UTILITY';
-              roleCounts[role] = (roleCounts[role] || 0) + 1;
-            }
-          });
-
-          kda = totalD > 0 ? (totalK + totalA) / totalD : (totalK + totalA);
-          mainChampion = Object.entries(champCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
-          
-          const roleMap: Record<string, string> = {
-            'TOP': 'Top', 'JUNGLE': 'Jungle', 'MIDDLE': 'Mid',
-            'BOTTOM': 'ADC', 'UTILITY': 'Support'
-          };
-          const mainRoleKey = Object.entries(roleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'UTILITY';
-          mainRole = roleMap[mainRoleKey] || 'Unknown';
-        }
-      }
-    } catch (e) {
-      console.warn('Match history not available:', e);
-    }
+    const summonerData = await apiRequest<{
+      id: string;
+      accountId: string;
+      name: string;
+      profileIconId: number;
+      summonerLevel: number;
+      revisionDate: number;
+    }>(
+      `/lol/summoner/v4/summoners/by-puuid/${accountData.puuid}`,
+      `summoner:${accountData.puuid}`,
+      600
+    );
 
     return {
-      ...data,
-      kda,
-      mainRole,
-      mainChampion,
-      recentForm: data.winRate,
+      data: {
+        gameName: accountData.gameName,
+        tagLine: accountData.tagLine,
+        puuid: accountData.puuid,
+        summonerId: summonerData.id,
+        accountId: summonerData.accountId,
+        name: summonerData.name,
+        profileIconId: summonerData.profileIconId,
+        summonerLevel: summonerData.summonerLevel,
+        revisionDate: summonerData.revisionDate,
+      },
+      region,
     };
   } catch (error) {
-    console.error('Search error:', error);
-    throw error;
-  }
-}
-
-export async function getPlayerStats(puuid: string, region: string = 'euw1'): Promise<PlayerStats> {
-  try {
-    console.log('Fetching player stats:', puuid, region);
-
-    const response = await fetch(
-      `/api/player?puuid=${encodeURIComponent(puuid)}&region=${region}`
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('Player API error:', errorData);
-      throw new Error(errorData.error || 'Failed to load player data');
+    if (error instanceof RiotAPIError) {
+      throw error;
     }
-
-    const data = await response.json();
-    console.log('Player stats loaded:', data);
-
-    return data;
-  } catch (error) {
-    console.error('getPlayerStats error:', error);
-    throw error;
+    throw new RiotAPIError(
+      `Failed to search player: ${(error as Error).message}`,
+      500
+    );
   }
 }
 
-export async function getMatchHistory(puuid: string, region: string = 'euw1'): Promise<MatchHistory[]> {
-  const regionalUrl = REGIONAL_ENDPOINTS[region] || REGIONAL_ENDPOINTS['euw1'];
+export async function getLeagueEntries(
+  summonerId: string
+): Promise<LeagueEntry[]> {
+  const cacheKey = `league:${summonerId}`;
 
   try {
-    const matchesRes = await fetch(
-      `${regionalUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`,
-      { headers: { 'X-Riot-Token': RIOT_API_KEY || '' } }
+    const data = await apiRequest<LeagueEntry[]>(
+      `/lol/league/v4/entries/by-summoner/${summonerId}`,
+      cacheKey,
+      600
     );
 
-    if (!matchesRes.ok) return [];
-
-    const matchIds = await matchesRes.json();
-    
-    const matches = await Promise.all(
-      matchIds.map((id: string) =>
-        fetch(`${regionalUrl}/lol/match/v5/matches/${id}`, {
-          headers: { 'X-Riot-Token': RIOT_API_KEY || '' },
-        })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null)
-      )
-    );
-
-    return matches.filter(m => m !== null).map((match: any) => {
-      const p = match.info.participants.find((x: any) => x.puuid === puuid);
-      const kda = p.deaths > 0 ? (p.kills + p.assists) / p.deaths : (p.kills + p.assists);
-      
-      return {
-        matchId: match.metadata.matchId,
-        champion: p.championName,
-        kills: p.kills,
-        deaths: p.deaths,
-        assists: p.assists,
-        win: p.win,
-        duration: formatGameDuration(match.info.gameDuration),
-        ago: calculateTimeAgo(match.info.gameEndTimestamp),
-        mode: match.info.queueId === 420 ? 'Ranked Solo/Duo' : 'Normal',
-        kda,
-      };
-    });
+    return data || [];
   } catch (error) {
-    console.error('Match history error:', error);
+    console.error('Failed to get league entries:', error);
     return [];
   }
 }
 
-export function formatRank(tier: string, rank: string): string {
-  if (tier === 'UNRANKED') return 'Unranked';
-  if (tier === 'CHALLENGER' || tier === 'GRANDMASTER' || tier === 'MASTER') return tier.charAt(0) + tier.slice(1).toLowerCase();
-  return `${tier.charAt(0) + tier.slice(1).toLowerCase()} ${rank}`;
+export async function getChampionMastery(
+  summonerId: string
+): Promise<any[]> {
+  const cacheKey = `mastery:${summonerId}`;
+
+  try {
+    const data = await apiRequest<any[]>(
+      `/lol/champion-mastery/v4/champion-masteries/by-summoner/${summonerId}`,
+      cacheKey,
+      600
+    );
+
+    return data || [];
+  } catch (error) {
+    console.error('Failed to get champion mastery:', error);
+    return [];
+  }
 }
+
+export function getAPIStats() {
+  return {
+    rateLimiter: rateLimiter.getStats(),
+    cache: cache.getStats(),
+  };
+}
+
+export type { RateLimitStats };
