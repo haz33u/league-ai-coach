@@ -1,3 +1,5 @@
+@import './styles/theme.css';
+
 * {
   margin: 0;
   padding: 0;
@@ -6,516 +8,66 @@
 
 html {
   scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'SF Pro Display', 'SF Pro Text', 'Roboto', sans-serif; 
-  font-size: 16px;
-  line-height: 1.6;
-  background: #ffffff;
-  color: #1d1d1d;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-weight: 400;
-  letter-spacing: -0.3px;
-  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+  transition: background 0.3s, color 0.3s;
+  overflow-x: hidden;
 }
 
-/* Subtle animated background - ОЧЕНЬ ЛЁГКОЕ */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(0, 113, 227, 0.02) 0%,
-    rgba(124, 58, 237, 0.01) 50%,
-    rgba(0, 113, 227, 0.02) 100%
-  );
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Hero section */
-.hero {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120px 20px 80px;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 1000px;
-  height: 1000px;
-  background: radial-gradient(circle, rgba(0, 113, 227, 0.08) 0%, transparent 70%);
-  z-index: 0;
-  pointer-events: none;
-  filter: blur(100px);
-}
-
-.hero-content {
-  max-width: 1000px;
-  text-align: center;
-  position: relative;
-  z-index: 2;
-}
-
-.hero-title {
-  font-size: 68px;
+h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -2px;
-  margin-bottom: 32px;
-  color: #000000;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
-@media (max-width: 1024px) {
-  .hero-title {
-    font-size: 52px;
-    letter-spacing: -1.5px;
-  }
-}
-
-@media (max-width: 640px) {
-  .hero-title {
-    font-size: 36px;
-    letter-spacing: -1px;
-    margin-bottom: 20px;
-  }
-}
-
-.hero-subtitle {
-  font-size: 24px;
-  font-weight: 400;
-  line-height: 1.4;
-  letter-spacing: -0.5px;
-  color: #424245;
-  margin-bottom: 48px;
-  max-width: 900px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-@media (max-width: 640px) {
-  .hero-subtitle {
-    font-size: 18px;
-    margin-bottom: 40px;
-  }
-}
-
-/* NAVIGATION */
-.nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  padding: 0;
-}
-
-.nav-content {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.3px;
-  color: #0071e3;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.logo svg {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-}
-
-.nav-links {
-  display: flex;
-  gap: 36px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-links a {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.43;
-  letter-spacing: -0.2px;
-  color: #0071e3;
+a {
+  color: var(--blue);
   text-decoration: none;
-  transition: color 0.15s ease-out;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
-.nav-links a:hover {
-  color: #0077ed;
-}
-
-@media (max-width: 768px) {
-  .nav-links {
-    display: none;
-  }
-}
-
-/* BUTTONS */
-.btn-primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 11px 28px;
-  background: #0071e3;
-  color: #ffffff;
+button {
+  font-family: inherit;
+  background: none;
   border: none;
-  border-radius: 980px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.43;
-  letter-spacing: -0.3px;
+  padding: 0;
+  margin: 0;
   cursor: pointer;
-  transition: all 0.25s ease-out;
+  font-size: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+input, select, textarea {
+  width: 100%;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-  -webkit-user-select: none;
-  user-select: none;
+  border-width: 0;
 }
 
-.btn-primary:hover {
-  background: #0077ed;
-}
-
-.btn-primary:active {
-  background: #0066cc;
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 11px 28px;
-  background: transparent;
-  color: #0071e3;
-  border: 1px solid #d2d2d7;
-  border-radius: 980px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.43;
-  letter-spacing: -0.3px;
-  cursor: pointer;
-  transition: all 0.25s ease-out;
-  white-space: nowrap;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.btn-secondary:hover {
-  background: #f5f5f7;
-  border-color: #a1a1a6;
-}
-
-.btn-secondary:active {
-  background: #e5e5e7;
-}
-
-/* BUTTON GROUP */
-.button-group {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 48px;
-}
-
-@media (max-width: 640px) {
-  .button-group {
-    gap: 12px;
-    margin-top: 36px;
-  }
-}
-
-/* SECTION */
-.section {
-  padding: 120px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
-/* SCROLLBAR */
-::-webkit-scrollbar {
-  width: 12px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f5f5f7;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #d2d2d7;
-  border-radius: 6px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a6;
-}
-
-/* DARK MODE */
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #000000;
-    color: #f5f5f7;
-  }
-
-  body::before {
-    background: linear-gradient(
-      135deg,
-      rgba(0, 113, 227, 0.05) 0%,
-      rgba(124, 58, 237, 0.03) 50%,
-      rgba(0, 113, 227, 0.05) 100%
-    );
-  }
-
-  .hero-title {
-    color: #f5f5f7;
-  }
-
-  .hero-subtitle {
-    color: #a1a1a6;
-  }
-
-  .nav {
-    background: rgba(0, 0, 0, 0.95);
-  }
-
-  .btn-secondary {
-    background: rgba(29, 29, 31, 0.8);
-    border-color: #424245;
-  }
-
-  .btn-secondary:hover {
-    background: rgba(45, 45, 47, 0.9);
-    border-color: #a1a1a6;
-  }
-}
-/* ===== LEAGUE OF LEGENDS CHAMPION ICONS ===== */
-.champion-icon {
-  width: 64px;
-  height: 64px;
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-  cursor: pointer;
-}
-
-.champion-icon:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-
-/* ALL CHAMPIONS A-Z */
-.champion-Aatrox { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Aatrox.png'); }
-.champion-Ahri { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ahri.png'); }
-.champion-Akali { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Akali.png'); }
-.champion-Akshan { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Akshan.png'); }
-.champion-Alistar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Alistar.png'); }
-.champion-Amumu { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Amumu.png'); }
-.champion-Anivia { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Anivia.png'); }
-.champion-Annie { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Annie.png'); }
-.champion-Aphelios { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Aphelios.png'); }
-.champion-Ashe { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ashe.png'); }
-.champion-AurelionSol { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/AurelionSol.png'); }
-.champion-Azir { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Azir.png'); }
-.champion-Bard { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Bard.png'); }
-.champion-Belveth { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Belveth.png'); }
-.champion-Blitzcrank { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Blitzcrank.png'); }
-.champion-Brand { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Brand.png'); }
-.champion-Braum { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Braum.png'); }
-.champion-Briar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Briar.png'); }
-.champion-Caitlyn { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Caitlyn.png'); }
-.champion-Camille { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Camille.png'); }
-.champion-Cassiopeia { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Cassiopeia.png'); }
-.champion-Chogath { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Chogath.png'); }
-.champion-Corki { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Corki.png'); }
-.champion-Darius { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Darius.png'); }
-.champion-Diana { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Diana.png'); }
-.champion-Draven { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Draven.png'); }
-.champion-DrMundo { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/DrMundo.png'); }
-.champion-Ekko { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ekko.png'); }
-.champion-Elise { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Elise.png'); }
-.champion-Evelynn { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Evelynn.png'); }
-.champion-Ezreal { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ezreal.png'); }
-.champion-Fiddlesticks { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Fiddlesticks.png'); }
-.champion-Fiora { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Fiora.png'); }
-.champion-Fizz { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Fizz.png'); }
-.champion-Galio { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Galio.png'); }
-.champion-Gangplank { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Gangplank.png'); }
-.champion-Garen { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Garen.png'); }
-.champion-Gnar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Gnar.png'); }
-.champion-Gragas { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Gragas.png'); }
-.champion-Graves { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Graves.png'); }
-.champion-Gwen { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Gwen.png'); }
-.champion-Hecarim { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Hecarim.png'); }
-.champion-Heimerdinger { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Heimerdinger.png'); }
-.champion-Hwei { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Hwei.png'); }
-.champion-Illaoi { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Illaoi.png'); }
-.champion-Irelia { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Irelia.png'); }
-.champion-Ivern { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ivern.png'); }
-.champion-Janna { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Janna.png'); }
-.champion-JarvanIV { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/JarvanIV.png'); }
-.champion-Jax { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Jax.png'); }
-.champion-Jayce { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Jayce.png'); }
-.champion-Jhin { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Jhin.png'); }
-.champion-Jinx { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Jinx.png'); }
-.champion-Kaisa { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kaisa.png'); }
-.champion-Kalista { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kalista.png'); }
-.champion-Karma { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Karma.png'); }
-.champion-Karthus { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Karthus.png'); }
-.champion-Kassadin { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kassadin.png'); }
-.champion-Katarina { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Katarina.png'); }
-.champion-Kayle { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kayle.png'); }
-.champion-Kayn { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kayn.png'); }
-.champion-Kennen { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kennen.png'); }
-.champion-Khazix { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Khazix.png'); }
-.champion-Kindred { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kindred.png'); }
-.champion-Kled { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Kled.png'); }
-.champion-KogMaw { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/KogMaw.png'); }
-.champion-KSante { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/KSante.png'); }
-.champion-Leblanc { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Leblanc.png'); }
-.champion-LeeSin { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/LeeSin.png'); }
-.champion-Leona { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Leona.png'); }
-.champion-Lillia { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Lillia.png'); }
-.champion-Lissandra { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Lissandra.png'); }
-.champion-Lucian { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Lucian.png'); }
-.champion-Lulu { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Lulu.png'); }
-.champion-Lux { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Lux.png'); }
-.champion-Malphite { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Malphite.png'); }
-.champion-Malzahar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Malzahar.png'); }
-.champion-Maokai { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Maokai.png'); }
-.champion-MasterYi { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/MasterYi.png'); }
-.champion-Milio { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Milio.png'); }
-.champion-MissFortune { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/MissFortune.png'); }
-.champion-MonkeyKing { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/MonkeyKing.png'); }
-.champion-Mordekaiser { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Mordekaiser.png'); }
-.champion-Morgana { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Morgana.png'); }
-.champion-Naafiri { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Naafiri.png'); }
-.champion-Nami { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nami.png'); }
-.champion-Nasus { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nasus.png'); }
-.champion-Nautilus { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nautilus.png'); }
-.champion-Neeko { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Neeko.png'); }
-.champion-Nidalee { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nidalee.png'); }
-.champion-Nilah { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nilah.png'); }
-.champion-Nocturne { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nocturne.png'); }
-.champion-Nunu { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Nunu.png'); }
-.champion-Olaf { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Olaf.png'); }
-.champion-Orianna { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Orianna.png'); }
-.champion-Ornn { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ornn.png'); }
-.champion-Pantheon { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Pantheon.png'); }
-.champion-Poppy { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Poppy.png'); }
-.champion-Pyke { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Pyke.png'); }
-.champion-Qiyana { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Qiyana.png'); }
-.champion-Quinn { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Quinn.png'); }
-.champion-Rakan { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Rakan.png'); }
-.champion-Rammus { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Rammus.png'); }
-.champion-RekSai { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/RekSai.png'); }
-.champion-Rell { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Rell.png'); }
-.champion-Renata { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Renata.png'); }
-.champion-Renekton { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Renekton.png'); }
-.champion-Rengar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Rengar.png'); }
-.champion-Riven { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Riven.png'); }
-.champion-Rumble { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Rumble.png'); }
-.champion-Ryze { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ryze.png'); }
-.champion-Samira { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Samira.png'); }
-.champion-Sejuani { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sejuani.png'); }
-.champion-Senna { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Senna.png'); }
-.champion-Seraphine { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Seraphine.png'); }
-.champion-Sett { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sett.png'); }
-.champion-Shaco { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Shaco.png'); }
-.champion-Shen { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Shen.png'); }
-.champion-Shyvana { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Shyvana.png'); }
-.champion-Singed { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Singed.png'); }
-.champion-Sion { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sion.png'); }
-.champion-Sivir { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sivir.png'); }
-.champion-Skarner { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Skarner.png'); }
-.champion-Smolder { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Smolder.png'); }
-.champion-Sona { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sona.png'); }
-.champion-Soraka { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Soraka.png'); }
-.champion-Swain { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Swain.png'); }
-.champion-Sylas { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Sylas.png'); }
-.champion-Syndra { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Syndra.png'); }
-.champion-TahmKench { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/TahmKench.png'); }
-.champion-Taliyah { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Taliyah.png'); }
-.champion-Talon { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Talon.png'); }
-.champion-Taric { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Taric.png'); }
-.champion-Teemo { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Teemo.png'); }
-.champion-Thresh { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Thresh.png'); }
-.champion-Tristana { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Tristana.png'); }
-.champion-Trundle { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Trundle.png'); }
-.champion-Tryndamere { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Tryndamere.png'); }
-.champion-TwistedFate { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/TwistedFate.png'); }
-.champion-Twitch { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Twitch.png'); }
-.champion-Udyr { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Udyr.png'); }
-.champion-Urgot { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Urgot.png'); }
-.champion-Varus { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Varus.png'); }
-.champion-Vayne { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Vayne.png'); }
-.champion-Veigar { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Veigar.png'); }
-.champion-Velkoz { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Velkoz.png'); }
-.champion-Vex { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Vex.png'); }
-.champion-Vi { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Vi.png'); }
-.champion-Viego { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Viego.png'); }
-.champion-Viktor { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Viktor.png'); }
-.champion-Vladimir { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Vladimir.png'); }
-.champion-Volibear { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Volibear.png'); }
-.champion-Warwick { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Warwick.png'); }
-.champion-Xayah { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Xayah.png'); }
-.champion-Xerath { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Xerath.png'); }
-.champion-XinZhao { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/XinZhao.png'); }
-.champion-Yasuo { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Yasuo.png'); }
-.champion-Yone { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Yone.png'); }
-.champion-Yorick { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Yorick.png'); }
-.champion-Yuumi { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Yuumi.png'); }
-.champion-Zac { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zac.png'); }
-.champion-Zed { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zed.png'); }
-.champion-Zeri { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zeri.png'); }
-.champion-Ziggs { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Ziggs.png'); }
-.champion-Zilean { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zilean.png'); }
-.champion-Zoe { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zoe.png'); }
-.champion-Zyra { background-image: url('https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Zyra.png'); }
-:root {
-  --apple-gray: #f8f9fa;
-  --apple-black: #000;
-  --apple-white: #fff;
-  --border-radius: 8px;
-  --font-size: 16px;
+html {
+  overflow-y: scroll;
 }

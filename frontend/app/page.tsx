@@ -1,171 +1,163 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { searchPlayer } from '@/lib/api';
-import Logo from '@/components/Logo';
+import ThemeToggle from '@/components/ThemeToggle';
 import styles from './page.module.css';
+import { searchPlayer, RiotAPIError } from '@/lib/api';
+import { rateLimiter } from '@/lib/rateLimit';
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [region, setRegion] = useState('euw1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rateLimitInfo, setRateLimitInfo] = useState('');
 
-  async function handleSearch(e: FormEvent) {
+  const regions = [
+    { value: 'euw1', label: '🇪🇺 Europe West' },
+    { value: 'eun1', label: '🇪🇺 Europe Nordic & East' },
+    { value: 'na1', label: '🇺🇸 North America' },
+    { value: 'kr', label: '🇰🇷 Korea' },
+    { value: 'br1', label: '🇧🇷 Brazil' },
+    { value: 'tr1', label: '🇹🇷 Turkey' },
+    { value: 'ru', label: '🇷🇺 Russia' },
+  ];
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!gameName.trim()) {
-      setError('Enter summoner name');
+
+    if (!gameName.trim() || !tagLine.trim()) {
+      setError('Please enter both Game Name and Tag Line');
       return;
     }
 
-    setError('');
     setLoading(true);
+    setError('');
+    setRateLimitInfo('');
 
     try {
-      const data = await searchPlayer(
-        gameName.trim(), 
-        tagLine.trim() || 'EUW',
-        region
-      );
-      
-      const urlName = encodeURIComponent(data.gameName);
-      const urlTag = encodeURIComponent(data.tagLine);
-      router.push(`/player/${data.puuid}?region=${region}&name=${urlName}&tag=${urlTag}`);
-      
-    } catch (err: any) {
-      setError(err.message || 'Player not found');
+      const stats = rateLimiter.getStats();
+      setRateLimitInfo(`Rate Limit: ${stats.lastSecond}/${stats.limitSecond} req/s`);
+
+      const result = await searchPlayer(gameName, tagLine, region);
+
+      const params = new URLSearchParams({
+        name: result.data.gameName,
+        tag: result.data.tagLine,
+        region: result.region,
+      });
+
+      router.push(`/player/${result.data.puuid}?${params.toString()}`);
+    } catch (err) {
+      if (err instanceof RiotAPIError) {
+        if (err.statusCode === 404) {
+          setError(`Player "${gameName}#${tagLine}" not found.`);
+        } else if (err.statusCode === 429) {
+          setError('Rate limit reached. Please wait a moment.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Network error. Please check your connection.');
+      }
+    } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <>
+    <div className={styles.page}>
       <nav className={styles.nav}>
         <div className={styles.navContent}>
-          <a href="/" className={styles.navLogo}>
-            <Logo />
-            <span className={styles.navBrand}>Nexus Oracle</span>
-          </a>
+          <div className={styles.logo}>
+            <span className={styles.logoIcon}>⚡</span>
+            <div className={styles.logoText}>
+              <h1 className={styles.logoTitle}>Nexus Oracle</h1>
+              <p className={styles.logoSubtitle}>LoL Analytics</p>
+            </div>
+          </div>
+          <ThemeToggle />
         </div>
       </nav>
 
-      <main className={styles.main}>
-        <div className={styles.container}>
-          
-          <div className={styles.heroLogo}>
-            <div className={styles.logoCircle}>
-              <Logo />
-            </div>
+      <div className={styles.hero}>
+        <div className={styles.heroContent}>
+          <div className={styles.heroText}>
+            <h2 className={styles.heroTitle}>
+              League of Legends
+              <br />
+              <span className={styles.heroGradient}>Performance Analytics</span>
+            </h2>
+            <p className={styles.heroSubtitle}>
+              Professional-grade stats powered by Riot Games API
+            </p>
           </div>
 
-          <div className={styles.header}>
-            <h1 className={styles.title}>
-              <span className={styles.gradientText}>Nexus Oracle</span>
-            </h1>
-            <p className={styles.subtitle}>League of Legends Analytics</p>
-            <p className={styles.description}>Real-time player statistics powered by Riot API</p>
-          </div>
-
-          <div className={styles.searchCard}>
-            <form onSubmit={handleSearch} className={styles.searchForm}>
-              <div className={styles.inputsGrid}>
-                <input
-                  type="text"
-                  value={gameName}
-                  onChange={(e) => setGameName(e.target.value)}
-                  placeholder="Summoner name"
-                  className={styles.input}
-                  disabled={loading}
-                />
-
-                <input
-                  type="text"
-                  value={tagLine}
-                  onChange={(e) => setTagLine(e.target.value)}
-                  placeholder="Tag"
-                  className={styles.input}
-                  disabled={loading}
-                />
+          <form onSubmit={handleSearch} ref={formRef} className={styles.searchContainer}>
+            <div className={styles.searchForm}>
+              <div className={styles.inputWrapper}>
+                <div className={styles.inputGroup}>
+                  <input
+                    type="text"
+                    placeholder="Game Name"
+                    value={gameName}
+                    onChange={(e) => setGameName(e.target.value)}
+                    className={styles.input}
+                    disabled={loading}
+                    autoFocus
+                    autoComplete="off"
+                  />
+                  <span className={styles.separator}>#</span>
+                  <input
+                    type="text"
+                    placeholder="Tag"
+                    value={tagLine}
+                    onChange={(e) => setTagLine(e.target.value)}
+                    className={styles.inputTag}
+                    disabled={loading}
+                    autoComplete="off"
+                  />
+                </div>
 
                 <select
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
-                  className={styles.input}
                   disabled={loading}
                 >
-                  <option value="euw1">EUW</option>
-                  <option value="eun1">EUNE</option>
-                  <option value="na1">NA</option>
-                  <option value="kr">KR</option>
-                  <option value="br1">BR</option>
-                  <option value="la1">LAN</option>
-                  <option value="la2">LAS</option>
-                  <option value="tr1">TR</option>
-                  <option value="ru">RU</option>
-                  <option value="jp1">JP</option>
+                  {regions.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {error && <div className={styles.error}>{error}</div>}
+              <div className={styles.buttonGroup}>
+                <button type="submit" disabled={loading || !gameName.trim() || !tagLine.trim()}>
+                  {loading ? <>⟳ Searching...</> : <>🔍 Search</>}
+                </button>
+              </div>
 
-              <button 
-                type="submit" 
-                className={styles.button}
-                disabled={loading}
-              >
-                {loading ? 'Searching...' : 'Search Player'}
-              </button>
-            </form>
-          </div>
+              {error && (
+                <div className={styles.error} role="alert">
+                  {error}
+                </div>
+              )}
 
-          <div className={styles.examples}>
-            <p className={styles.examplesLabel}>Popular Players</p>
-            <div className={styles.exampleButtons}>
-              <button 
-                onClick={() => { setGameName('Diamondprox'); setTagLine('ProX'); setRegion('euw1'); }}
-                className={styles.exampleBtn}
-              >
-                Diamondprox
-              </button>
-              <button 
-                onClick={() => { setGameName('Faker'); setTagLine('T1'); setRegion('kr'); }}
-                className={styles.exampleBtn}
-              >
-                Faker
-              </button>
-              <button 
-                onClick={() => { setGameName('Caps'); setTagLine('FNC'); setRegion('euw1'); }}
-                className={styles.exampleBtn}
-              >
-                Caps
-              </button>
+              {rateLimitInfo && (
+                <div className={styles.rateLimitInfo}>
+                  {rateLimitInfo}
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className={styles.features}>
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>📊</div>
-              <h3>Real-time Stats</h3>
-              <p>Live rank, LP, winrate from Riot API</p>
-            </div>
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>🎯</div>
-              <h3>Match History</h3>
-              <p>Detailed game analytics & KDA</p>
-            </div>
-            <div className={styles.featureCard}>
-              <div className={styles.featureIcon}>🌍</div>
-              <h3>10 Regions</h3>
-              <p>EUW, NA, KR, and more</p>
-            </div>
-          </div>
-
+          </form>
         </div>
-      </main>
-    </>
+      </div>
+    </div>
   );
 }
