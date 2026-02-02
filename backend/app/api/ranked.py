@@ -4,6 +4,7 @@ Ranked API endpoints - ранковая информация
 """
 import httpx
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.exc import OperationalError
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from app.services.riot_api import RiotAPIService, RiotAPIError
@@ -361,47 +362,58 @@ async def get_ranked_by_name(
         summoner_level = summoner_data.get("summonerLevel", 0)
         summoner_id = summoner_data.get("id")
         
-        # 💾 Сохранение игрока в БД
-        player = crud.get_or_create_player(
-            db=db,
-            puuid=puuid,
-            game_name=game_name,
-            tag_line=tag_line,
-            region=region,
-            platform=platform,
-            summoner_level=summoner_level,
-            profile_icon_id=summoner_data.get("profileIconId")
-        )
+        # 💾 Сохранение игрока в БД (если БД доступна)
+        try:
+            player = crud.get_or_create_player(
+                db=db,
+                puuid=puuid,
+                game_name=game_name,
+                tag_line=tag_line,
+                region=region,
+                platform=platform,
+                summoner_level=summoner_level,
+                profile_icon_id=summoner_data.get("profileIconId"),
+            )
+        except OperationalError:
+            player = None
         
         # 3. МЕТОД 1: Попытка получить из LCU (приоритет!)
         lcu_data = await get_ranked_from_lcu()
         
         if lcu_data and lcu_data.get("ranked_solo"):
             # 💾 Сохранение ranked stats из LCU
-            crud.create_or_update_ranked_stats(
-                db=db,
-                player_id=player.id,
-                queue_type="RANKED_SOLO_5x5",
-                tier=lcu_data["ranked_solo"]["tier"],
-                rank=lcu_data["ranked_solo"]["rank"],
-                lp=lcu_data["ranked_solo"]["lp"],
-                wins=lcu_data["ranked_solo"]["wins"],
-                losses=lcu_data["ranked_solo"]["losses"],
-                data_source="LCU"
-            )
+            if player:
+                try:
+                    crud.create_or_update_ranked_stats(
+                        db=db,
+                        player_id=player.id,
+                        queue_type="RANKED_SOLO_5x5",
+                        tier=lcu_data["ranked_solo"]["tier"],
+                        rank=lcu_data["ranked_solo"]["rank"],
+                        lp=lcu_data["ranked_solo"]["lp"],
+                        wins=lcu_data["ranked_solo"]["wins"],
+                        losses=lcu_data["ranked_solo"]["losses"],
+                        data_source="LCU",
+                    )
+                except OperationalError:
+                    pass
             
             if lcu_data.get("ranked_flex"):
-                crud.create_or_update_ranked_stats(
-                    db=db,
-                    player_id=player.id,
-                    queue_type="RANKED_FLEX_SR",
-                    tier=lcu_data["ranked_flex"]["tier"],
-                    rank=lcu_data["ranked_flex"]["rank"],
-                    lp=lcu_data["ranked_flex"]["lp"],
-                    wins=lcu_data["ranked_flex"]["wins"],
-                    losses=lcu_data["ranked_flex"]["losses"],
-                    data_source="LCU"
-                )
+                if player:
+                    try:
+                        crud.create_or_update_ranked_stats(
+                            db=db,
+                            player_id=player.id,
+                            queue_type="RANKED_FLEX_SR",
+                            tier=lcu_data["ranked_flex"]["tier"],
+                            rank=lcu_data["ranked_flex"]["rank"],
+                            lp=lcu_data["ranked_flex"]["lp"],
+                            wins=lcu_data["ranked_flex"]["wins"],
+                            losses=lcu_data["ranked_flex"]["losses"],
+                            data_source="LCU",
+                        )
+                    except OperationalError:
+                        pass
             
             return {
                 "player": {
@@ -424,19 +436,23 @@ async def get_ranked_by_name(
         
         if apex_rank:
             # 💾 Сохранение apex rank
-            crud.create_or_update_ranked_stats(
-                db=db,
-                player_id=player.id,
-                queue_type="RANKED_SOLO_5x5",
-                tier=apex_rank["tier"],
-                rank=apex_rank["rank"],
-                lp=apex_rank["lp"],
-                wins=apex_rank["wins"],
-                losses=apex_rank["losses"],
-                veteran=apex_rank["veteran"],
-                hot_streak=apex_rank["hot_streak"],
-                data_source="riot_api_apex"
-            )
+            if player:
+                try:
+                    crud.create_or_update_ranked_stats(
+                        db=db,
+                        player_id=player.id,
+                        queue_type="RANKED_SOLO_5x5",
+                        tier=apex_rank["tier"],
+                        rank=apex_rank["rank"],
+                        lp=apex_rank["lp"],
+                        wins=apex_rank["wins"],
+                        losses=apex_rank["losses"],
+                        veteran=apex_rank["veteran"],
+                        hot_streak=apex_rank["hot_streak"],
+                        data_source="riot_api_apex",
+                    )
+                except OperationalError:
+                    pass
             
             total_games = apex_rank["wins"] + apex_rank["losses"]
             winrate = round((apex_rank["wins"] / total_games) * 100, 1) if total_games > 0 else 0
@@ -489,19 +505,23 @@ async def get_ranked_by_name(
                     queue_type = queue.get("queueType")
                     
                     # 💾 Сохранение ranked stats
-                    crud.create_or_update_ranked_stats(
-                        db=db,
-                        player_id=player.id,
-                        queue_type=queue_type,
-                        tier=queue.get("tier"),
-                        rank=queue.get("rank"),
-                        lp=queue.get("leaguePoints", 0),
-                        wins=queue.get("wins", 0),
-                        losses=queue.get("losses", 0),
-                        veteran=queue.get("veteran", False),
-                        hot_streak=queue.get("hotStreak", False),
-                        data_source="riot_api"
-                    )
+                    if player:
+                        try:
+                            crud.create_or_update_ranked_stats(
+                                db=db,
+                                player_id=player.id,
+                                queue_type=queue_type,
+                                tier=queue.get("tier"),
+                                rank=queue.get("rank"),
+                                lp=queue.get("leaguePoints", 0),
+                                wins=queue.get("wins", 0),
+                                losses=queue.get("losses", 0),
+                                veteran=queue.get("veteran", False),
+                                hot_streak=queue.get("hotStreak", False),
+                                data_source="riot_api",
+                            )
+                        except OperationalError:
+                            pass
                     
                     wins = queue.get("wins", 0)
                     losses = queue.get("losses", 0)

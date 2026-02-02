@@ -25,6 +25,19 @@ export default function RootLayout({
         <ThemeProvider>
           <ErrorBoundary>
             {children}
+            <footer className="site-footer">
+              <div className="footer-content">
+                <span>Nexus Oracle © 2026. Not endorsed by Riot Games.</span>
+                <div className="footer-links">
+                  <a href="https://www.riotgames.com" target="_blank" rel="noreferrer">
+                    Riot Games
+                  </a>
+                  <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer">
+                    Riot API
+                  </a>
+                </div>
+              </div>
+            </footer>
           </ErrorBoundary>
         </ThemeProvider>
       </body>

@@ -123,3 +123,73 @@ def create_or_update_ranked_stats(db: Session, player_id: int, queue_type: str,
 def get_all_ranked_stats(db: Session, player_id: int) -> List[RankedStats]:
     """Получить всю ранковую статистику игрока"""
     return db.query(RankedStats).filter(RankedStats.player_id == player_id).all()
+
+
+# ============================================================================
+# MATCH HISTORY CRUD
+# ============================================================================
+
+def get_match_by_match_id(db: Session, match_id: str) -> Optional[MatchHistory]:
+    """Получить матч по match_id"""
+    return db.query(MatchHistory).filter(MatchHistory.match_id == match_id).first()
+
+
+def create_or_update_match_history(
+    db: Session,
+    player_id: int,
+    match_id: str,
+    game_mode: str,
+    game_duration: int,
+    game_creation: Optional[datetime],
+    champion_name: str,
+    kills: int,
+    deaths: int,
+    assists: int,
+    win: bool,
+    total_damage: int,
+    gold_earned: int,
+    cs: int,
+    vision_score: int,
+    raw_data: dict,
+) -> MatchHistory:
+    """Создать или обновить матч в истории"""
+    existing = get_match_by_match_id(db, match_id)
+    if existing:
+        existing.game_mode = game_mode
+        existing.game_duration = game_duration
+        existing.game_creation = game_creation
+        existing.champion_name = champion_name
+        existing.kills = kills
+        existing.deaths = deaths
+        existing.assists = assists
+        existing.win = win
+        existing.total_damage = total_damage
+        existing.gold_earned = gold_earned
+        existing.cs = cs
+        existing.vision_score = vision_score
+        existing.raw_data = raw_data
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    match = MatchHistory(
+        player_id=player_id,
+        match_id=match_id,
+        game_mode=game_mode,
+        game_duration=game_duration,
+        game_creation=game_creation,
+        champion_name=champion_name,
+        kills=kills,
+        deaths=deaths,
+        assists=assists,
+        win=win,
+        total_damage=total_damage,
+        gold_earned=gold_earned,
+        cs=cs,
+        vision_score=vision_score,
+        raw_data=raw_data,
+    )
+    db.add(match)
+    db.commit()
+    db.refresh(match)
+    return match

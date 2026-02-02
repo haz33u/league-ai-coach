@@ -4,13 +4,7 @@ Main FastAPI application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api import summoner  # Импортируем наш новый router
-from app.api import summoner, match  # ← Импортируем  match
-from app.api import summoner, match, stats # Импортируем stats.py 
-from app.api import summoner, match, stats, ranked #Имортим ranked.py
-from app.api import summoner, match, stats, ranked, live  # Имопрт live.py
-from app.api import summoner, match, stats, ranked, players #Импорт players.py
-from app.api import lcu # Импорт lcu.py
+from app.api import summoner, match, stats, ranked, live, players, lcu, analysis
 
 # Create FastAPI app
 app = FastAPI(
@@ -59,6 +53,7 @@ app.include_router(ranked.router, prefix="/api/ranked", tags=["ranked"])
 app.include_router(live.router, prefix="/api/live", tags=["live"])
 app.include_router(lcu.router, prefix="/api/lcu", tags=["LCU"])
 app.include_router(players.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 
 
 if __name__ == "__main__":

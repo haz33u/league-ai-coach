@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { getLeaderboard } from '@/lib/api';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 
 export default function LeaderboardPage() {
@@ -41,25 +40,20 @@ export default function LeaderboardPage() {
                 <th className="p-4">#</th>
                 <th className="p-4">Summoner</th>
                 <th className="p-4">LP</th>
-                <th className="p-4">W/L</th>
                 <th className="p-4">Win Rate</th>
               </tr>
             </thead>
             <tbody>
               {players.map((player, index) => (
-                <motion.tr
-                  key={player.summonerId}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
+                <tr
+                  key={player.puuid}
                   className="border-t border-white/10 hover:bg-white/5 transition-colors"
                 >
                   <td className="p-4 font-bold text-primary">{index + 1}</td>
-                  <td className="p-4">{player.summonerName}</td>
-                  <td className="p-4">{player.leaguePoints} LP</td>
-                  <td className="p-4">{player.wins}W / {player.losses}L</td>
-                  <td className="p-4">{Math.round((player.wins / (player.wins + player.losses)) * 100)}%</td>
-                </motion.tr>
+                  <td className="p-4">{player.game_name}#{player.tag_line}</td>
+                  <td className="p-4">{player.rank?.lp ?? 0} LP</td>
+                  <td className="p-4">{Math.round(player.rank?.winrate ?? 0)}%</td>
+                </tr>
               ))}
             </tbody>
           </table>

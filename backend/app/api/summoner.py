@@ -2,6 +2,7 @@
 Summoner API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from app.models_old.summoner import (
     SummonerRequest, 
@@ -41,17 +42,21 @@ async def search_summoner(request: SummonerRequest, db: Session = Depends(get_db
         
         summoner = SummonerInfo(**summoner_data)
         
-        # 💾 Сохранение игрока в БД
-        player = crud.get_or_create_player(
-            db=db,
-            puuid=account.puuid,
-            game_name=request.game_name,
-            tag_line=request.tag_line,
-            region=request.region,
-            platform=request.platform,
-            summoner_level=summoner.summonerLevel,
-            profile_icon_id=summoner.profileIconId
-        )
+        # 💾 Сохранение игрока в БД (если БД доступна)
+        try:
+            crud.get_or_create_player(
+                db=db,
+                puuid=account.puuid,
+                game_name=request.game_name,
+                tag_line=request.tag_line,
+                region=request.region,
+                platform=request.platform,
+                summoner_level=summoner.summonerLevel,
+                profile_icon_id=summoner.profileIconId,
+            )
+        except OperationalError:
+            # DB is optional for search; continue without persistence
+            pass
         
         # 3. Получаем историю матчей
         try:

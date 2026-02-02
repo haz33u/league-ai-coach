@@ -189,7 +189,7 @@
   user-select: none;
 }
 
-select {
+:global(select) {
   background: var(--bg-glass-thick);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -207,11 +207,11 @@ select {
   padding-right: var(--space-12);
 }
 
-select:hover {
+:global(select:hover) {
   border-color: var(--blue);
 }
 
-select:focus {
+:global(select:focus) {
   outline: 2px solid var(--blue);
 }
 
@@ -221,7 +221,7 @@ select:focus {
   margin-top: var(--space-4);
 }
 
-button[type="submit"] {
+:global(button[type="submit"]) {
   flex: 1;
   padding: var(--space-3) var(--space-6);
   border: none;
@@ -240,16 +240,16 @@ button[type="submit"] {
   box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
 }
 
-button[type="submit"]:hover:not(:disabled) {
+:global(button[type="submit"]:hover:not(:disabled)) {
   box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
   transform: translateY(-2px);
 }
 
-button[type="submit"]:active:not(:disabled) {
+:global(button[type="submit"]:active:not(:disabled)) {
   transform: translateY(0);
 }
 
-button[type="submit"]:disabled {
+:global(button[type="submit"]:disabled) {
   opacity: 0.6;
   cursor: not-allowed;
 }

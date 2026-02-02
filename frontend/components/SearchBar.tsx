@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { searchPlayer, formatRank, type PlayerStats } from '@/lib/api';
+import { searchPlayer, type PlayerSearchResult } from '@/lib/api';
 import styles from './SearchBar.module.css';
 
 export default function SearchBar() {
@@ -10,7 +10,7 @@ export default function SearchBar() {
   const [tagLine, setTagLine] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [playerData, setPlayerData] = useState<PlayerStats | null>(null);
+  const [playerData, setPlayerData] = useState<PlayerSearchResult | null>(null);
   const router = useRouter();
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -26,12 +26,12 @@ export default function SearchBar() {
 
   try {
     const player = await searchPlayer(gameName.trim(), tagLine.trim());
-    setPlayerData(player);
+    setPlayerData(player.data);
     setError('');
     
     // ПЕРЕХОД НА СТРАНИЦУ ИГРОКА
     setTimeout(() => {
-      router.push(`/player/${player.puuid}`);
+      router.push(`/player/${player.data.puuid}`);
     }, 1000);
   } catch (err) {
     setError('Player not found. Try again!');
@@ -187,17 +187,17 @@ export default function SearchBar() {
                 {playerData.gameName} <span className={styles.playerTag}>#{playerData.tagLine}</span>
               </h3>
               <p className={styles.playerRank}>
-                {formatRank(playerData.tier, playerData.rank)} • Level {playerData.level}
+                Profile found • Level {playerData.summonerLevel}
               </p>
             </div>
             <div className={styles.playerStats}>
               <div className={styles.statItem}>
                 <span className={styles.statLabel}>Win Rate</span>
-                <span className={styles.statValue}>{playerData.winRate.toFixed(1)}%</span>
+                <span className={styles.statValue}>—</span>
               </div>
               <div className={styles.statItem}>
                 <span className={styles.statLabel}>Record</span>
-                <span className={styles.statValue}>{playerData.wins}W-{playerData.losses}L</span>
+                <span className={styles.statValue}>—</span>
               </div>
             </div>
           </div>

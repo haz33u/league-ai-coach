@@ -63,10 +63,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTimeout(() => announcement.remove(), 1000);
   };
 
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, systemTheme }}>
       {children}

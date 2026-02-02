@@ -1,7 +1,17 @@
-import { cache } from './cache';
-import { rateLimiter, RateLimitStats } from './rateLimit';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
 
-const API_BASE = 'https://americas.api.riotgames.com';
+const PLATFORM_TO_REGION: Record<string, string> = {
+  ru: 'europe',
+  euw1: 'europe',
+  eun1: 'europe',
+  tr1: 'europe',
+  na1: 'americas',
+  br1: 'americas',
+  la1: 'americas',
+  la2: 'americas',
+  kr: 'asia',
+  jp1: 'asia',
+};
 
 export class RiotAPIError extends Error {
   constructor(
@@ -13,8 +23,6 @@ export class RiotAPIError extends Error {
     this.name = 'RiotAPIError';
   }
 }
-
-const pendingRequests = new Map<string, Promise<any>>();
 
 export interface PlayerSearchResult {
   gameName: string;
@@ -28,164 +36,145 @@ export interface PlayerSearchResult {
   revisionDate: number;
 }
 
-export interface LeagueEntry {
-  summonerId: string;
-  queueType: 'RANKED_SOLO_5x5' | 'RANKED_FLEX_SR' | 'RANKED_FLEX_TT';
-  tier: 'DIAMOND' | 'PLATINUM' | 'GOLD' | 'SILVER' | 'BRONZE' | 'IRON' | 'MASTER' | 'GRANDMASTER' | 'CHALLENGER';
-  rank: 'I' | 'II' | 'III' | 'IV';
-  leaguePoints: number;
-  wins: number;
-  losses: number;
-  hotStreak: boolean;
-  veteran: boolean;
-  freshBlood: boolean;
-  inactive: boolean;
+export interface AnalysisResponse {
+  player: {
+    game_name: string;
+    tag_line: string;
+    puuid: string;
+    level: number;
+    profile_icon_id?: number;
+  };
+  ranked: {
+    solo?: {
+      queueType?: string;
+      tier?: string;
+      rank?: string;
+      leaguePoints?: number;
+      wins?: number;
+      losses?: number;
+    } | null;
+    flex?: {
+      queueType?: string;
+      tier?: string;
+      rank?: string;
+      leaguePoints?: number;
+      wins?: number;
+      losses?: number;
+    } | null;
+  };
+  summary: {
+    total_games: number;
+    wins: number;
+    losses: number;
+    winrate: number;
+  };
+  performance: {
+    avg_kda: number;
+    avg_cs: number;
+    avg_cs_per_min?: number;
+    avg_vision_score: number;
+    avg_vision_per_min?: number;
+    avg_gold?: number;
+    avg_gold_per_min?: number;
+    avg_damage?: number;
+    avg_damage_per_min?: number;
+    avg_kill_participation?: number;
+  };
+  roles: {
+    main_role: string;
+    breakdown: Record<string, { games: number; percentage: number }>;
+  };
+  champions: Record<string, { games: number; wins: number; losses: number; winrate: number }>;
+  recent_matches: RecentMatch[];
+  dna?: {
+    primary: string;
+    tags: string[];
+    scores: Record<string, number>;
+  };
+  learning_path?: {
+    main_role: string;
+    focuses: { title: string; reason: string; action: string }[];
+  };
+  early_game?: {
+    tracked_matches: number;
+    avg_early_kills: number;
+    avg_early_deaths: number;
+    avg_early_assists: number;
+    first_objective_participation_rate: number;
+  } | null;
 }
 
-interface RetryConfig {
-  maxRetries: number;
-  initialDelay: number;
-  maxDelay: number;
-  backoffMultiplier: number;
+export interface RankedQueue {
+  tier?: string;
+  rank?: string;
+  leaguePoints?: number;
+  wins?: number;
+  losses?: number;
 }
 
-const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,
-  initialDelay: 1000,
-  maxDelay: 10000,
-  backoffMultiplier: 2,
-};
-
-async function fetchWithRetry(
-  url: string,
-  options?: RequestInit,
-  retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG
-): Promise<Response> {
-  let lastError: Error | null = null;
-  let delay = retryConfig.initialDelay;
-
-  for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options?.headers || {}),
-        },
-      });
-
-      if (response.status === 404 || response.status === 403) {
-        throw new RiotAPIError(
-          `API Error: ${response.status}`,
-          response.status,
-          await response.json().catch(() => ({}))
-        );
-      }
-
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After');
-        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delay;
-        console.warn(`⏳ Rate limited. Waiting ${waitTime}ms...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-
-      if (response.status >= 500) {
-        if (attempt === retryConfig.maxRetries) {
-          throw new RiotAPIError(
-            `Server Error: ${response.status}`,
-            response.status
-          );
-        }
-        console.warn(`⚠️ Server error ${response.status}. Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay = Math.min(delay * retryConfig.backoffMultiplier, retryConfig.maxDelay);
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new RiotAPIError(
-          `HTTP Error: ${response.status}`,
-          response.status
-        );
-      }
-
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-
-      if (error instanceof RiotAPIError && (error.statusCode === 404 || error.statusCode === 403)) {
-        throw error;
-      }
-
-      if (attempt < retryConfig.maxRetries) {
-        console.warn(
-          `❌ Attempt ${attempt + 1}/${retryConfig.maxRetries + 1} failed. Retrying in ${delay}ms...`,
-          error
-        );
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay = Math.min(delay * retryConfig.backoffMultiplier, retryConfig.maxDelay);
-      }
-    }
-  }
-
-  throw lastError || new Error('Max retries exceeded');
+export interface RankedByNameResponse {
+  solo: RankedQueue | null;
+  flex: RankedQueue | null;
 }
 
-async function apiRequest<T>(
-  endpoint: string,
-  cacheKey?: string,
-  cacheTTL: number = 300
-): Promise<T> {
-  const apiKey = process.env.RIOT_API_KEY;
-  if (!apiKey) {
-    throw new Error('RIOT_API_KEY environment variable is not set');
+export interface RecentMatch {
+  match_id: string;
+  queue_id?: number;
+  game_duration?: number;
+  game_creation?: number;
+  champion: string;
+  role: string;
+  team_position?: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  kda: number;
+  cs: number;
+  lane_cs?: number;
+  neutral_cs?: number;
+  cs_per_min?: number;
+  vision_score?: number;
+  vision_per_min?: number;
+  gold?: number;
+  gold_per_min?: number;
+  damage?: number;
+  damage_per_min?: number;
+  win: boolean;
+  items: number[];
+  spells: number[];
+  runes?: Record<string, any>;
+  champion_detail?: { id: string; name: string; icon: string };
+  items_detail?: { id: number; name: string; icon: string }[];
+  spells_detail?: { id: number; name: string; icon: string }[];
+  runes_detail?: {
+    primary_style?: { id: number; name: string; icon: string };
+    sub_style?: { id: number; name: string; icon: string };
+    keystone?: { id: number; name: string; icon: string };
+    perks?: { id: number; name: string; icon: string }[];
+  };
+}
+
+async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new RiotAPIError(error?.detail || `HTTP Error: ${response.status}`, response.status, error);
   }
 
-  if (cacheKey) {
-    const cached = cache.get<T>(cacheKey);
-    if (cached) return cached;
-  }
-
-  if (cacheKey && pendingRequests.has(cacheKey)) {
-    console.log(`📋 Deduplicating request for ${cacheKey}`);
-    return pendingRequests.get(cacheKey)!;
-  }
-
-  const requestPromise = (async () => {
-    try {
-      await rateLimiter.waitForSlot();
-
-      const url = `${API_BASE}${endpoint}?api_key=${apiKey}`;
-      const stats = rateLimiter.getStats();
-      console.log(`🌐 API Request: ${endpoint} (${stats.lastSecond}/${stats.limitSecond} req/s)`);
-
-      const response = await fetchWithRetry(url);
-      const data: T = await response.json();
-
-      if (cacheKey) {
-        cache.set(cacheKey, data, cacheTTL);
-      }
-
-      return data;
-    } finally {
-      if (cacheKey) {
-        pendingRequests.delete(cacheKey);
-      }
-    }
-  })();
-
-  if (cacheKey) {
-    pendingRequests.set(cacheKey, requestPromise);
-  }
-
-  return requestPromise;
+  return response.json();
 }
 
 export async function searchPlayer(
   gameName: string,
   tagLine: string,
-  region: string = 'euw1'
+  platform: string = 'euw1'
 ): Promise<{
   data: PlayerSearchResult;
   region: string;
@@ -194,45 +183,31 @@ export async function searchPlayer(
     throw new Error('Game name and tag line are required');
   }
 
-  const cacheKey = `player:${gameName}:${tagLine}:${region}`;
-  
+  const region = PLATFORM_TO_REGION[platform] || 'europe';
   try {
-    const accountData = await apiRequest<{
-      gameName: string;
-      tagLine: string;
-      puuid: string;
-    }>(
-      `/riot/account/v1/accounts/by-game-name/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-      cacheKey,
-      600
-    );
-
-    const summonerData = await apiRequest<{
-      id: string;
-      accountId: string;
-      name: string;
-      profileIconId: number;
-      summonerLevel: number;
-      revisionDate: number;
-    }>(
-      `/lol/summoner/v4/summoners/by-puuid/${accountData.puuid}`,
-      `summoner:${accountData.puuid}`,
-      600
-    );
+    const result = await fetchJson<any>(`${BACKEND_URL}/api/summoner/search`, {
+      method: 'POST',
+      body: JSON.stringify({
+        game_name: gameName,
+        tag_line: tagLine,
+        region,
+        platform,
+      }),
+    });
 
     return {
       data: {
-        gameName: accountData.gameName,
-        tagLine: accountData.tagLine,
-        puuid: accountData.puuid,
-        summonerId: summonerData.id,
-        accountId: summonerData.accountId,
-        name: summonerData.name,
-        profileIconId: summonerData.profileIconId,
-        summonerLevel: summonerData.summonerLevel,
-        revisionDate: summonerData.revisionDate,
+        gameName: result.account.gameName,
+        tagLine: result.account.tagLine,
+        puuid: result.account.puuid,
+        summonerId: result.summoner?.id || '',
+        accountId: result.summoner?.accountId || '',
+        name: `${result.account.gameName}#${result.account.tagLine}`,
+        profileIconId: result.summoner?.profileIconId || 0,
+        summonerLevel: result.summoner?.summonerLevel || 0,
+        revisionDate: result.summoner?.revisionDate || 0,
       },
-      region,
+      region: platform,
     };
   } catch (error) {
     if (error instanceof RiotAPIError) {
@@ -245,49 +220,62 @@ export async function searchPlayer(
   }
 }
 
-export async function getLeagueEntries(
-  summonerId: string
-): Promise<LeagueEntry[]> {
-  const cacheKey = `league:${summonerId}`;
-
-  try {
-    const data = await apiRequest<LeagueEntry[]>(
-      `/lol/league/v4/entries/by-summoner/${summonerId}`,
-      cacheKey,
-      600
-    );
-
-    return data || [];
-  } catch (error) {
-    console.error('Failed to get league entries:', error);
-    return [];
-  }
+export function formatRank(tier?: string | null, rank?: string | null) {
+  if (!tier || tier === 'UNRANKED') return 'Unranked';
+  return rank ? `${tier} ${rank}` : tier;
 }
 
-export async function getChampionMastery(
-  summonerId: string
-): Promise<any[]> {
-  const cacheKey = `mastery:${summonerId}`;
+export async function getPlayerAnalysisByPuuid(
+  puuid: string,
+  platform: string,
+  options?: { includeTimeline?: boolean; timelineMatches?: number }
+): Promise<AnalysisResponse> {
+  const region = PLATFORM_TO_REGION[platform] || 'europe';
+  const params = new URLSearchParams({
+    puuid,
+    region,
+    platform,
+    include_timeline: options?.includeTimeline ? 'true' : 'false',
+    timeline_matches: String(options?.timelineMatches ?? 0),
+  });
 
-  try {
-    const data = await apiRequest<any[]>(
-      `/lol/champion-mastery/v4/champion-masteries/by-summoner/${summonerId}`,
-      cacheKey,
-      600
-    );
-
-    return data || [];
-  } catch (error) {
-    console.error('Failed to get champion mastery:', error);
-    return [];
-  }
+  return fetchJson<AnalysisResponse>(`${BACKEND_URL}/api/analysis/by-puuid?${params.toString()}`);
 }
 
-export function getAPIStats() {
+export async function getRankedByName(
+  gameName: string,
+  tagLine: string,
+  platform: string
+): Promise<RankedByNameResponse> {
+  const region = PLATFORM_TO_REGION[platform] || 'europe';
+  const params = new URLSearchParams({
+    game_name: gameName,
+    tag_line: tagLine,
+    region,
+    platform,
+  });
+
+  const data = await fetchJson<any>(`${BACKEND_URL}/api/ranked/by-name?${params.toString()}`, {
+    method: 'POST',
+  });
+
+  const normalize = (entry: any): RankedQueue | null => {
+    if (!entry) return null;
+    return {
+      tier: entry.tier,
+      rank: entry.rank,
+      leaguePoints: entry.lp ?? entry.leaguePoints ?? 0,
+      wins: entry.wins,
+      losses: entry.losses,
+    };
+  };
+
   return {
-    rateLimiter: rateLimiter.getStats(),
-    cache: cache.getStats(),
+    solo: normalize(data.ranked_solo),
+    flex: normalize(data.ranked_flex),
   };
 }
 
-export type { RateLimitStats };
+export async function getLeaderboard(limit: number = 10) {
+  return fetchJson<any[]>(`${BACKEND_URL}/api/players/leaderboard/?limit=${limit}`);
+}

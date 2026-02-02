@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { getPlayerStats, getMatchHistory, formatRank, type PlayerStats, type MatchHistory } from '@/lib/api';
+import { getPlayerAnalysisByPuuid, getRankedByName, formatRank, type AnalysisResponse, type RecentMatch, type RankedQueue } from '@/lib/api';
 import Logo from '@/components/Logo';
 import styles from './page.module.css';
 
@@ -10,35 +10,44 @@ export default function PlayerPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const puuid = params.puuid as string;
-  const region = searchParams.get('region') || 'euw1';
+  const platform = searchParams.get('region') || 'euw1';
   const gameName = searchParams.get('name') || 'Unknown';
   const tagLine = searchParams.get('tag') || 'Unknown';
   
-  const [playerData, setPlayerData] = useState<PlayerStats | null>(null);
-  const [matches, setMatches] = useState<MatchHistory[]>([]);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  const [matches, setMatches] = useState<RecentMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [rankedFallback, setRankedFallback] = useState<RankedQueue | null>(null);
 
   useEffect(() => {
     async function loadPlayer() {
       try {
         setLoading(true);
-        console.log('📊 Loading player:', puuid, region);
+        console.log('📊 Loading player:', puuid, platform);
         
-        // Load player stats
-        const data = await getPlayerStats(puuid, region);
+        const data = await getPlayerAnalysisByPuuid(puuid, platform, {
+          includeTimeline: true,
+          timelineMatches: 3,
+        });
         console.log('✅ Player loaded:', data);
         
         // Override with URL params if available
-        if (gameName !== 'Unknown') data.gameName = gameName;
-        if (tagLine !== 'Unknown') data.tagLine = tagLine;
+        if (gameName !== 'Unknown') data.player.game_name = gameName;
+        if (tagLine !== 'Unknown') data.player.tag_line = tagLine;
         
-        setPlayerData(data);
-        
-        // Load match history
-        const matchHistory = await getMatchHistory(puuid, region);
-        console.log('✅ Matches loaded:', matchHistory.length);
-        setMatches(matchHistory);
+        setAnalysis(data);
+        setMatches(data.recent_matches || []);
+
+        const hasRanked = Boolean(data.ranked?.solo?.tier || data.ranked?.flex?.tier);
+        if (!hasRanked && gameName !== 'Unknown' && tagLine !== 'Unknown') {
+          try {
+            const rankedData = await getRankedByName(gameName, tagLine, platform);
+            setRankedFallback(rankedData.solo || rankedData.flex || null);
+          } catch (rankErr) {
+            console.warn('Ranked fallback failed:', rankErr);
+          }
+        }
         
       } catch (err: any) {
         console.error('❌ Load error:', err);
@@ -51,7 +60,113 @@ export default function PlayerPage() {
     if (puuid) {
       loadPlayer();
     }
-  }, [puuid, region, gameName, tagLine]);
+  }, [puuid, platform, gameName, tagLine]);
+
+  const getRankIconSources = (tier?: string | null) => {
+    const tierUpper = (tier || 'UNRANKED').toUpperCase();
+    const localMap: Record<string, string> = {
+      UNRANKED: 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png',
+      IRON: '/ranks/IronLogo.png',
+      BRONZE: '/ranks/BronzeLogo.png',
+      SILVER: '/ranks/SilverLogo.png',
+      GOLD: '/ranks/GoldLogo.png',
+      PLATINUM: '/ranks/PlatinumLogo.png',
+      EMERALD: '/ranks/EmeraldLogo.png',
+      DIAMOND: '/ranks/DiamondLogo.png',
+      MASTER: '/ranks/MasterLogo.png',
+      GRANDMASTER: '/ranks/GrandMasterLogo.png',
+      CHALLENGER: '/ranks/ChallengerLogo.png',
+    };
+
+    const tierLower = tierUpper.toLowerCase();
+    const tierTitle = tierLower.charAt(0).toUpperCase() + tierLower.slice(1);
+
+    return [
+      localMap[tierUpper] || localMap.UNRANKED,
+      `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/RankedEmblem_${tierTitle}.png`,
+      `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tierLower}.png`,
+    ];
+  };
+
+  const getProfileIcon = (profileIconId?: number) => {
+    const iconId = profileIconId || 29;
+    return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`;
+  };
+
+  const getRoleIcon = (role: string) => {
+    const roleKey = role.toLowerCase();
+    const spellMap: Record<string, string> = {
+      top: 'SummonerTeleport.png',
+      jungle: 'SummonerSmite.png',
+      mid: 'SummonerDot.png',
+      middle: 'SummonerDot.png',
+      adc: 'SummonerHeal.png',
+      bottom: 'SummonerHeal.png',
+      support: 'SummonerExhaust.png',
+      utility: 'SummonerExhaust.png',
+    };
+    const spell = spellMap[roleKey] || 'SummonerFlash.png';
+    return `https://ddragon.leagueoflegends.com/cdn/16.2.1/img/spell/${spell}`;
+  };
+
+  const getStatGlyph = (key: 'win' | 'kda' | 'games') => {
+    const glyphs: Record<string, string> = {
+      win: 'W/R',
+      kda: 'KDA',
+      games: 'GMS',
+    };
+    return glyphs[key];
+  };
+
+  const rankedEntry = analysis?.ranked?.solo || analysis?.ranked?.flex || rankedFallback || null;
+  const rankedTier = rankedEntry?.tier || 'UNRANKED';
+  const rankedRank = rankedEntry?.rank || '';
+  const rankedLp = rankedEntry?.leaguePoints ?? 0;
+  const rankIconSources = useMemo(() => getRankIconSources(rankedTier), [rankedTier]);
+
+  const mainChampion = useMemo(() => {
+    if (!analysis) return 'Unknown';
+    const entries = Object.entries(analysis.champions || {});
+    if (entries.length === 0) return 'Unknown';
+    return entries.sort((a, b) => b[1].games - a[1].games)[0][0];
+  }, [analysis]);
+
+  const mainChampionIcon = useMemo(() => {
+    if (!analysis) return '';
+    const match = matches.find((m) => m.champion === mainChampion);
+    return match?.champion_detail?.icon || '';
+  }, [analysis, matches, mainChampion]);
+
+  const queueLabel = (queueId?: number) => {
+    switch (queueId) {
+      case 420:
+        return 'Ranked Solo/Duo';
+      case 440:
+        return 'Ranked Flex';
+      case 450:
+        return 'ARAM';
+      default:
+        return 'Ranked';
+    }
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '—';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  const formatAgo = (timestamp?: number) => {
+    if (!timestamp) return '—';
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
   if (loading) {
     return (
@@ -62,7 +177,7 @@ export default function PlayerPage() {
     );
   }
 
-  if (error || !playerData) {
+  if (error || !analysis) {
     return (
       <div className={styles.error}>
         <h2>Player not found</h2>
@@ -71,20 +186,6 @@ export default function PlayerPage() {
       </div>
     );
   }
-
-  const getRankIcon = (tier: string) => {
-    if (!tier || tier === 'UNRANKED') {
-      return 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png';
-    }
-    const tierLower = tier.toLowerCase();
-    return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tierLower}.png`;
-  };
-
-  const getProfileIcon = (level: number) => {
-    // Use a default profile icon based on level
-    const iconId = (level % 28) + 1;
-    return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`;
-  };
 
   return (
     <>
@@ -100,29 +201,14 @@ export default function PlayerPage() {
         </div>
       </nav>
 
-      <main className={styles.main}>
+      <main className={styles.main} data-rank={rankedTier.toLowerCase()}>
         <div className={styles.container}>
           
           {/* LIVE INDICATOR */}
-          <div style={{ 
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-            padding: '12px 24px', 
-            borderRadius: '12px', 
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              background: '#fff',
-              borderRadius: '50%',
-              animation: 'pulse 2s ease-in-out infinite'
-            }} />
-            <span style={{ color: '#fff', fontWeight: 600, fontSize: '14px' }}>
-              🔴 LIVE STATS - Updated from Riot API • Region: {region.toUpperCase()}
+          <div className={styles.liveIndicator}>
+            <div className={styles.liveDot} />
+            <span>
+              Nexus Oracle • Live analysis • Platform: {platform.toUpperCase()}
             </span>
           </div>
 
@@ -132,24 +218,42 @@ export default function PlayerPage() {
             <div className={styles.profileContent}>
               <div className={styles.profileAvatarContainer}>
                 <img 
-                  src={getProfileIcon(playerData.level)} 
+                  src={getProfileIcon(analysis.player.profile_icon_id)} 
                   alt="Profile Icon"
                   className={styles.profileAvatar}
                   onError={(e) => {
                     e.currentTarget.src = 'https://ddragon.leagueoflegends.com/cdn/14.1.1/img/profileicon/29.png';
                   }}
                 />
-                <div className={styles.levelBadge}>{playerData.level}</div>
+                <div className={styles.levelBadge}>{analysis.player.level}</div>
               </div>
               <div className={styles.profileInfo}>
-                <h1 className={styles.playerName}>
-                  {playerData.gameName} <span className={styles.tag}>#{playerData.tagLine}</span>
-                </h1>
+                <div className={styles.playerNameWrap}>
+                  <h1 className={styles.playerName}>
+                    {analysis.player.game_name} <span className={styles.tag}>#{analysis.player.tag_line}</span>
+                  </h1>
+                </div>
                 <div className={styles.rankInfo}>
+                  <div className={styles.rankFrame}>
+                    <img
+                      src={rankIconSources[0]}
+                      alt={rankedTier}
+                      className={styles.rankEmblem}
+                      data-fallback-idx="0"
+                      onError={(e) => {
+                        const current = Number(e.currentTarget.dataset.fallbackIdx || '0');
+                        const next = current + 1;
+                        if (rankIconSources[next]) {
+                          e.currentTarget.dataset.fallbackIdx = String(next);
+                          e.currentTarget.src = rankIconSources[next];
+                        }
+                      }}
+                    />
+                  </div>
                   <span className={styles.rankBadge}>
-                    {formatRank(playerData.tier, playerData.rank)}
+                    {formatRank(rankedTier, rankedRank)}
                   </span>
-                  <span className={styles.lpBadge}>{playerData.leaguePoints} LP</span>
+                  <span className={styles.lpBadge}>{rankedLp} LP</span>
                 </div>
               </div>
             </div>
@@ -158,17 +262,17 @@ export default function PlayerPage() {
           {/* STATS OVERVIEW */}
           <div className={styles.statsOverview}>
             <div className={styles.statItem}>
-              <div className={styles.statValue}>{playerData.winRate.toFixed(1)}%</div>
+              <div className={styles.statValue}>{analysis.summary.winrate.toFixed(1)}%</div>
               <div className={styles.statLabel}>Win Rate</div>
             </div>
             <div className={styles.statDivider}></div>
             <div className={styles.statItem}>
-              <div className={styles.statValue}>{playerData.wins}W {playerData.losses}L</div>
+              <div className={styles.statValue}>{analysis.summary.wins}W {analysis.summary.losses}L</div>
               <div className={styles.statLabel}>Ranked Games</div>
             </div>
             <div className={styles.statDivider}></div>
             <div className={styles.statItem}>
-              <div className={styles.statValue}>{playerData.kda.toFixed(1)}:1</div>
+              <div className={styles.statValue}>{analysis.performance.avg_kda.toFixed(2)}:1</div>
               <div className={styles.statLabel}>Average KDA</div>
             </div>
           </div>
@@ -180,14 +284,17 @@ export default function PlayerPage() {
             <div className={`${styles.statCard} ${styles.green}`}>
               <div className={styles.cardInner}>
                 <div className={styles.iconWrapper}>
-                  <svg className={styles.iconSvg} viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="#22c55e"/>
-                  </svg>
+                  <span className={styles.tooltipWrap}>
+                    <div className={styles.statGlyph} aria-label="Win rate">
+                      {getStatGlyph('win')}
+                    </div>
+                    <span className={styles.tooltip}>Win Rate</span>
+                  </span>
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Win Rate</p>
-                  <h3 className={styles.value}>{playerData.winRate.toFixed(1)}%</h3>
-                  <p className={styles.subtext}>{playerData.wins}W - {playerData.losses}L</p>
+                  <h3 className={styles.value}>{analysis.summary.winrate.toFixed(1)}%</h3>
+                  <p className={styles.subtext}>{analysis.summary.wins}W - {analysis.summary.losses}L</p>
                 </div>
               </div>
             </div>
@@ -195,14 +302,17 @@ export default function PlayerPage() {
             <div className={`${styles.statCard} ${styles.blue}`}>
               <div className={styles.cardInner}>
                 <div className={styles.iconWrapper}>
-                  <svg className={styles.iconSvg} viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 7V12C2 17.55 5.84 22.54 12 24C18.16 22.54 22 17.55 22 12V7L12 2Z" fill="#0071e3"/>
-                  </svg>
+                  <span className={styles.tooltipWrap}>
+                    <div className={styles.statGlyph} aria-label="Average KDA">
+                      {getStatGlyph('kda')}
+                    </div>
+                    <span className={styles.tooltip}>Average KDA</span>
+                  </span>
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Average KDA</p>
-                  <h3 className={styles.value}>{playerData.kda.toFixed(1)}:1</h3>
-                  <p className={styles.subtext}>Last 10 games</p>
+                  <h3 className={styles.value}>{analysis.performance.avg_kda.toFixed(2)}:1</h3>
+                  <p className={styles.subtext}>Recent matches</p>
                 </div>
               </div>
             </div>
@@ -210,35 +320,45 @@ export default function PlayerPage() {
             <div className={`${styles.statCard} ${styles.purple}`}>
               <div className={styles.cardInner}>
                 <div className={styles.iconWrapper}>
-                  <svg className={styles.iconSvg} viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" fill="#7c3aed" opacity="0.2"/>
-                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V11H13V17ZM13 9H11V7H13V9Z" fill="#7c3aed"/>
-                  </svg>
+                  <span className={styles.tooltipWrap}>
+                    <div className={styles.statGlyph} aria-label="Total games">
+                      {getStatGlyph('games')}
+                    </div>
+                    <span className={styles.tooltip}>Total Games</span>
+                  </span>
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Total Games</p>
-                  <h3 className={styles.value}>{playerData.totalGames.toLocaleString()}</h3>
-                  <p className={styles.subtext}>Ranked Solo/Duo</p>
+                  <h3 className={styles.value}>{analysis.summary.total_games.toLocaleString()}</h3>
+                  <p className={styles.subtext}>{queueLabel(420)}</p>
                 </div>
               </div>
             </div>
 
             <div className={`${styles.statCard} ${styles.orange}`}>
               <div className={styles.cardInner}>
-                <div className={styles.iconWrapperLarge}>
-                  <img 
-                    src={getRankIcon(playerData.tier)} 
-                    alt={playerData.tier}
-                    className={styles.rankIconLarge}
-                    onError={(e) => {
-                      e.currentTarget.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png';
-                    }}
-                  />
+                <div className={`${styles.iconWrapperLarge} ${styles.rankIconWrapper}`}>
+                  <div className={styles.rankFrameLarge}>
+                    <img 
+                      src={rankIconSources[0]} 
+                      alt={rankedTier}
+                      className={styles.rankIconLarge}
+                      data-fallback-idx="0"
+                      onError={(e) => {
+                        const current = Number(e.currentTarget.dataset.fallbackIdx || '0');
+                        const next = current + 1;
+                        if (rankIconSources[next]) {
+                          e.currentTarget.dataset.fallbackIdx = String(next);
+                          e.currentTarget.src = rankIconSources[next];
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Current Rank</p>
-                  <h3 className={styles.value}>{formatRank(playerData.tier, playerData.rank)}</h3>
-                  <p className={styles.subtext}>{playerData.leaguePoints} LP</p>
+                  <h3 className={styles.value}>{formatRank(rankedTier, rankedRank)}</h3>
+                  <p className={styles.subtext}>{rankedLp} LP</p>
                 </div>
               </div>
             </div>
@@ -246,42 +366,109 @@ export default function PlayerPage() {
             <div className={`${styles.statCard} ${styles.blue}`}>
               <div className={styles.cardInner}>
                 <div className={styles.iconWrapper}>
-                  <svg className={styles.iconSvg} viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 19H22L12 2Z" fill="#0071e3" opacity="0.3"/>
-                    <path d="M12 2L19 14H5L12 2Z" fill="#0071e3"/>
-                  </svg>
+                  <img
+                    src={getRoleIcon(analysis.roles.main_role)}
+                    alt={analysis.roles.main_role}
+                    className={styles.statIconImage}
+                    onError={(e) => {
+                      e.currentTarget.src = 'https://ddragon.leagueoflegends.com/cdn/16.2.1/img/spell/SummonerFlash.png';
+                    }}
+                  />
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Main Role</p>
-                  <h3 className={styles.value}>{playerData.mainRole}</h3>
-                  <p className={styles.subtext}>Most played</p>
+                  <div className={styles.roleRow}>
+                    <h3 className={styles.value}>{analysis.roles.main_role}</h3>
+                  </div>
+                  <p className={styles.subtext}>Primary role</p>
                 </div>
               </div>
             </div>
 
             <div className={`${styles.statCard} ${styles.purple}`}>
               <div className={styles.cardInner}>
-                <div className={styles.iconWrapperLarge}>
+                <div className={styles.iconWrapper} title={mainChampion}>
                   <div 
-                    className={`champion-icon champion-${playerData.mainChampion.replace(/\s+/g, '')}`}
+                    className={`${styles.championIconInner} champion-${mainChampion.replace(/\s+/g, '')}`}
                     style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      borderRadius: '12px',
-                      background: `url(https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${playerData.mainChampion.replace(/[\s']/g, '')}.png)`,
-                      backgroundSize: 'cover'
+                      backgroundImage: mainChampionIcon
+                        ? `url(${mainChampionIcon})`
+                        : `url(https://ddragon.leagueoflegends.com/cdn/16.2.1/img/champion/${mainChampion.replace(/[\s']/g, '')}.png)`,
                     }}
                   />
                 </div>
                 <div className={styles.cardContent}>
                   <p className={styles.label}>Main Champion</p>
-                  <h3 className={styles.value}>{playerData.mainChampion}</h3>
+                  <h3 className={styles.value}>{mainChampion}</h3>
                   <p className={styles.subtext}>Most played</p>
                 </div>
               </div>
             </div>
 
           </div>
+
+          <div className={styles.gridSplit}>
+            <div className={styles.glassPanel}>
+              <h2 className={styles.sectionTitle}>Nexus DNA</h2>
+              <div className={styles.dnaHeader}>
+                <span className={styles.dnaPrimary}>{analysis.dna?.primary || 'Balanced'}</span>
+                <div className={styles.dnaTags}>
+                  {(analysis.dna?.tags || []).map((tag) => (
+                    <span key={tag} className={styles.tagPill}>{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.dnaScores}>
+                {analysis.dna?.scores &&
+                  Object.entries(analysis.dna.scores).map(([key, value]) => (
+                    <div key={key} className={styles.scoreRow}>
+                      <span className={styles.scoreLabel}>{key}</span>
+                      <div className={styles.scoreBar}>
+                        <div className={styles.scoreFill} style={{ width: `${value}%` }} />
+                      </div>
+                      <span className={styles.scoreValue}>{value}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <div className={styles.glassPanel}>
+              <h2 className={styles.sectionTitle}>Learning Path</h2>
+              <div className={styles.learningList}>
+                {(analysis.learning_path?.focuses || []).map((focus) => (
+                  <div key={focus.title} className={styles.learningItem}>
+                    <h3>{focus.title}</h3>
+                    <p className={styles.learningReason}>{focus.reason}</p>
+                    <p className={styles.learningAction}>{focus.action}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {analysis.early_game && (
+            <div className={styles.glassPanel}>
+              <h2 className={styles.sectionTitle}>Early Game Pulse</h2>
+              <div className={styles.earlyGrid}>
+                <div>
+                  <span className={styles.earlyLabel}>Early Kills</span>
+                  <span className={styles.earlyValue}>{analysis.early_game.avg_early_kills}</span>
+                </div>
+                <div>
+                  <span className={styles.earlyLabel}>Early Deaths</span>
+                  <span className={styles.earlyValue}>{analysis.early_game.avg_early_deaths}</span>
+                </div>
+                <div>
+                  <span className={styles.earlyLabel}>Early Assists</span>
+                  <span className={styles.earlyValue}>{analysis.early_game.avg_early_assists}</span>
+                </div>
+                <div>
+                  <span className={styles.earlyLabel}>First Objective</span>
+                  <span className={styles.earlyValue}>{Math.round(analysis.early_game.first_objective_participation_rate * 100)}%</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* RECENT MATCHES */}
           <h2 className={styles.sectionTitle}>Recent Matches</h2>
@@ -299,16 +486,19 @@ export default function PlayerPage() {
                     </span>
                   </div>
                   <div className={styles.matchDetails}>
-                    <div 
-                      className={styles.matchChampionIcon}
-                      style={{ 
-                        background: `url(https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/${match.champion.replace(/[\s']/g, '')}.png)`,
-                        backgroundSize: 'cover'
-                      }} 
-                    />
+                    <span className={styles.tooltipWrap}>
+                      <div
+                        className={styles.matchChampionIcon}
+                        style={{
+                          backgroundImage: `url(${match.champion_detail?.icon || `https://ddragon.leagueoflegends.com/cdn/16.2.1/img/champion/${match.champion.replace(/[\s']/g, '')}.png`})`,
+                          backgroundSize: 'cover'
+                        }} 
+                      />
+                      <span className={styles.tooltip}>{match.champion}</span>
+                    </span>
                     <div className={styles.matchInfo}>
                       <div className={styles.matchChamp}>{match.champion}</div>
-                      <div className={styles.matchMode}>{match.mode}</div>
+                      <div className={styles.matchMode}>{queueLabel(match.queue_id)}</div>
                     </div>
                     <div className={styles.matchKDA}>
                       <div className={styles.matchKDAValue}>{match.kills} / {match.deaths} / {match.assists}</div>
@@ -317,8 +507,56 @@ export default function PlayerPage() {
                       </div>
                     </div>
                     <div className={styles.matchTime}>
-                      <div className={styles.matchDuration}>{match.duration}</div>
-                      <div className={styles.matchAgo}>{match.ago}</div>
+                      <div className={styles.matchDuration}>{formatDuration(match.game_duration)}</div>
+                      <div className={styles.matchAgo}>{formatAgo(match.game_creation)}</div>
+                    </div>
+                  </div>
+                  <div className={styles.matchMeta}>
+                    <div className={styles.iconRow}>
+                      {(match.items_detail || []).map((item) => (
+                        <span key={item.id} className={styles.tooltipWrap}>
+                          <img src={item.icon} alt={item.name} className={styles.itemIcon} />
+                          <span className={styles.tooltip}>{item.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className={styles.iconRow}>
+                      {(match.spells_detail || []).map((spell) => (
+                        <span key={spell.id} className={styles.tooltipWrap}>
+                          <img src={spell.icon} alt={spell.name} className={styles.spellIcon} />
+                          <span className={styles.tooltip}>{spell.name}</span>
+                        </span>
+                      ))}
+                      {match.runes_detail?.keystone && (
+                        <span className={styles.tooltipWrap}>
+                          <img
+                            src={match.runes_detail.keystone.icon}
+                            alt={match.runes_detail.keystone.name}
+                            className={styles.runeIcon}
+                          />
+                          <span className={styles.tooltip}>{match.runes_detail.keystone.name}</span>
+                        </span>
+                      )}
+                      {match.runes_detail?.sub_style && (
+                        <span className={styles.tooltipWrap}>
+                          <img
+                            src={match.runes_detail.sub_style.icon}
+                            alt={match.runes_detail.sub_style.name}
+                            className={styles.runeStyleIcon}
+                          />
+                          <span className={styles.tooltip}>{match.runes_detail.sub_style.name}</span>
+                        </span>
+                      )}
+                      {(match.runes_detail?.perks || []).slice(0, 4).map((perk) => (
+                        <span key={perk.id} className={styles.tooltipWrap}>
+                          <img
+                            src={perk.icon}
+                            alt={perk.name}
+                            className={styles.runeStyleIcon}
+                          />
+                          <span className={styles.tooltip}>{perk.name}</span>
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -329,12 +567,6 @@ export default function PlayerPage() {
         </div>
       </main>
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
     </>
   );
 }

@@ -11,9 +11,9 @@ build/
 # Environment
 .env
 .env.local
-.env.*.local
-.env.production.local
-
+.env*.local
+.env*.backup
+*.backup
 # IDE
 .vscode/
 .idea/
