@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 from app.models_old.summoner import SummonerRequest
 from app.schemas.analysis import AnalysisResponse
 from app.services.riot_api import RiotAPIService, RiotAPIError
-from app.services.analytics import summarize_matches, build_player_dna, build_learning_path
+from app.services.analytics import summarize_matches, build_player_dna, build_learning_path, build_coaching_recap
 from app.services.ddragon import ddragon
 from app.services.timeline import summarize_timeline
 from app.database import get_db
@@ -100,6 +100,7 @@ async def analyze_by_name(
 
         analysis["dna"] = build_player_dna(analysis)
         analysis["learning_path"] = build_learning_path(analysis)
+        analysis["coaching_recap"] = build_coaching_recap(analysis)
 
         player_id = None
         if persist:
@@ -208,6 +209,7 @@ async def analyze_by_puuid(
 
         analysis["dna"] = build_player_dna(analysis)
         analysis["learning_path"] = build_learning_path(analysis)
+        analysis["coaching_recap"] = build_coaching_recap(analysis)
 
         player_id = None
         if persist:

@@ -86,7 +86,8 @@ class RiotAPIService:
         self,
         puuid: str,
         region: str = "europe",
-        platform: Optional[str] = None
+        platform: Optional[str] = None,
+        client: Optional[httpx.AsyncClient] = None,
     ) -> Dict[str, Any]:
         """Получить account по PUUID"""
         regional_base = self._regional_base(region, platform)
@@ -98,16 +99,20 @@ class RiotAPIService:
         if cached:
             return cached
 
-        async with httpx.AsyncClient() as client:
+        if client:
             response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=600)
-                return data
-            elif response.status_code == 404:
-                raise RiotAPIError(404, "Account not found")
-            else:
-                raise RiotAPIError(response.status_code, response.text)
+        else:
+            async with httpx.AsyncClient() as session:
+                response = await session.get(url, headers=self.headers, timeout=10.0)
+
+        if response.status_code == 200:
+            data = response.json()
+            self.cache.set(cache_key, data, ttl_seconds=600)
+            return data
+        elif response.status_code == 404:
+            raise RiotAPIError(404, "Account not found")
+        else:
+            raise RiotAPIError(response.status_code, response.text)
     
     async def get_summoner_by_puuid(
         self, 
@@ -135,6 +140,37 @@ class RiotAPIService:
                 raise RiotAPIError(404, "Summoner not found")
             else:
                 raise RiotAPIError(response.status_code, response.text)
+
+    async def get_summoner_by_id(
+        self,
+        summoner_id: str,
+        platform: str = "euw1",
+        client: Optional[httpx.AsyncClient] = None,
+    ) -> Dict[str, Any]:
+        """Получить summoner по summonerId"""
+        platform_base = self._platform_base(platform)
+        endpoint = f"/lol/summoner/v4/summoners/{summoner_id}"
+        url = f"{platform_base}{endpoint}"
+
+        cache_key = f"summoner:id:{platform}:{summoner_id}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        if client:
+            response = await client.get(url, headers=self.headers, timeout=10.0)
+        else:
+            async with httpx.AsyncClient() as session:
+                response = await session.get(url, headers=self.headers, timeout=10.0)
+
+        if response.status_code == 200:
+            data = response.json()
+            self.cache.set(cache_key, data, ttl_seconds=300)
+            return data
+        elif response.status_code == 404:
+            raise RiotAPIError(404, "Summoner not found")
+        else:
+            raise RiotAPIError(response.status_code, response.text)
     
     async def get_match_history(
         self,
@@ -251,6 +287,75 @@ class RiotAPIService:
                 return []
             else:
                 raise RiotAPIError(response.status_code, response.text)
+
+    async def get_challenger_league(
+        self,
+        platform: str = "euw1",
+        queue: str = "RANKED_SOLO_5x5"
+    ) -> Dict[str, Any]:
+        """Получить список Challenger лиги по очереди"""
+        platform_base = self._platform_base(platform)
+        endpoint = f"/lol/league/v4/challengerleagues/by-queue/{queue}"
+        url = f"{platform_base}{endpoint}"
+
+        cache_key = f"challenger:{platform}:{queue}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=self.headers, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                self.cache.set(cache_key, data, ttl_seconds=60)
+                return data
+            raise RiotAPIError(response.status_code, response.text)
+
+    async def get_grandmaster_league(
+        self,
+        platform: str = "euw1",
+        queue: str = "RANKED_SOLO_5x5"
+    ) -> Dict[str, Any]:
+        """Получить список Grandmaster лиги по очереди"""
+        platform_base = self._platform_base(platform)
+        endpoint = f"/lol/league/v4/grandmasterleagues/by-queue/{queue}"
+        url = f"{platform_base}{endpoint}"
+
+        cache_key = f"grandmaster:{platform}:{queue}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=self.headers, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                self.cache.set(cache_key, data, ttl_seconds=60)
+                return data
+            raise RiotAPIError(response.status_code, response.text)
+
+    async def get_master_league(
+        self,
+        platform: str = "euw1",
+        queue: str = "RANKED_SOLO_5x5"
+    ) -> Dict[str, Any]:
+        """Получить список Master лиги по очереди"""
+        platform_base = self._platform_base(platform)
+        endpoint = f"/lol/league/v4/masterleagues/by-queue/{queue}"
+        url = f"{platform_base}{endpoint}"
+
+        cache_key = f"master:{platform}:{queue}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=self.headers, timeout=10.0)
+            if response.status_code == 200:
+                data = response.json()
+                self.cache.set(cache_key, data, ttl_seconds=60)
+                return data
+            raise RiotAPIError(response.status_code, response.text)
 
     async def get_champion_mastery(
         self,

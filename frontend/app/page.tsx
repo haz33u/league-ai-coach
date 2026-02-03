@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ThemeToggle from '@/components/ThemeToggle';
+import Logo from '@/components/Logo';
 import styles from './page.module.css';
 import { searchPlayer, RiotAPIError } from '@/lib/api';
 import { rateLimiter } from '@/lib/rateLimit';
@@ -72,16 +73,30 @@ export default function HomePage() {
 
   return (
     <div className={styles.page}>
+      <div className={styles.arcaneMarks} />
+      <div className={styles.scanline} />
+      <div className={styles.graffitiLeft}>JINX WAS HERE</div>
+      <div className={styles.graffitiRight}>HEXTECH CORE</div>
+      <div className={styles.graffitiMid}>PILTOVER SIGNAL</div>
+      <div className={styles.graffitiLowLeft}>COUNCIL NODE</div>
+      <div className={styles.graffitiHighRight}>ARCANE TRACE</div>
+      <div className={styles.graffitiSigil} />
       <nav className={styles.nav}>
         <div className={styles.navContent}>
           <div className={styles.logo}>
-            <span className={styles.logoIcon}>⚡</span>
+            <span className={styles.logoIcon}><Logo /></span>
             <div className={styles.logoText}>
               <h1 className={styles.logoTitle}>Nexus Oracle</h1>
               <p className={styles.logoSubtitle}>LoL Analytics</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className={styles.navActions}>
+            <div className={styles.navLinks}>
+              <a href="/" className={styles.navLink}>Home</a>
+              <a href="/leaderboard" className={styles.navLink}>Leaderboard</a>
+            </div>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 

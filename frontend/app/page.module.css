@@ -1,10 +1,228 @@
 .page {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--bg-base) 0%, var(--bg-elevated) 100%);
+  background: var(--bg-arcane);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow-x: hidden;
+}
+
+.page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(124, 58, 237, 0.18), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(34, 211, 238, 0.16), transparent 45%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.page::after {
+  content: 'GET JINXED';
+  position: absolute;
+  top: 120px;
+  right: 6%;
+  font-size: 46px;
+  letter-spacing: 8px;
+  font-weight: 800;
+  color: rgba(124, 58, 237, 0.12);
+  text-shadow: 0 12px 30px rgba(124, 58, 237, 0.45);
+  transform: rotate(-6deg);
+  pointer-events: none;
+  animation: arcaneFlicker 6s ease-in-out infinite;
+}
+
+.page .arcaneMarks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background-image:
+    linear-gradient(120deg, rgba(124, 58, 237, 0.05), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cpath d='M20 18l18 18M20 36l18-18M90 82l26 26M90 108l26-26M120 28l20 20M120 48l20-20' stroke='rgba(16,185,129,0.28)' stroke-width='2'/%3E%3Cpath d='M60 60l18 18M60 78l18-18' stroke='rgba(168,85,247,0.28)' stroke-width='2'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+  animation: arcaneDrift 10s ease-in-out infinite;
+}
+
+.page .arcaneMarks::after {
+  content: 'ARCANE WARD';
+  position: absolute;
+  bottom: 120px;
+  left: 6%;
+  font-size: 32px;
+  letter-spacing: 6px;
+  font-weight: 700;
+  color: rgba(16, 185, 129, 0.18);
+  text-shadow: 0 12px 30px rgba(16, 185, 129, 0.45);
+  transform: rotate(3deg);
+  animation: wardPulse 5.4s ease-in-out infinite;
+}
+
+.scanline {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.5), rgba(168, 85, 247, 0.5), transparent);
+  opacity: 0.55;
+  filter: blur(1px);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+}
+
+.scanline::after {
+  content: '';
+  position: absolute;
+  inset: -18px 0 -32px 0;
+  background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.18), rgba(168, 85, 247, 0.12), transparent);
+  filter: blur(14px);
+  opacity: 0.6;
+}
+
+.graffitiLeft,
+.graffitiRight {
+  position: absolute;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.graffitiLeft {
+  left: 6%;
+  top: 28%;
+  color: rgba(168, 85, 247, 0.18);
+  text-shadow: 0 10px 26px rgba(168, 85, 247, 0.35);
+  transform: rotate(-8deg);
+  animation: graffitiPulse 7s ease-in-out infinite;
+}
+
+.graffitiRight {
+  right: 8%;
+  bottom: 18%;
+  color: rgba(16, 185, 129, 0.2);
+  text-shadow: 0 10px 26px rgba(16, 185, 129, 0.35);
+  transform: rotate(6deg);
+  animation: graffitiPulse 6s ease-in-out infinite;
+}
+
+.graffitiMid {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%) rotate(-2deg);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: rgba(59, 130, 246, 0.18);
+  text-shadow: 0 10px 26px rgba(59, 130, 246, 0.35);
+  animation: graffitiPulse 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.graffitiLowLeft {
+  position: absolute;
+  left: 10%;
+  bottom: 22%;
+  transform: rotate(4deg);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 7px;
+  text-transform: uppercase;
+  color: rgba(14, 165, 233, 0.16);
+  text-shadow: 0 10px 24px rgba(14, 165, 233, 0.35);
+  animation: graffitiPulse 7.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.graffitiHighRight {
+  position: absolute;
+  right: 12%;
+  top: 10%;
+  transform: rotate(-4deg);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: rgba(244, 114, 182, 0.18);
+  text-shadow: 0 10px 24px rgba(244, 114, 182, 0.35);
+  animation: graffitiPulse 6.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.graffitiSigil {
+  position: absolute;
+  right: 18%;
+  top: 36%;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background-image:
+    radial-gradient(circle, rgba(168, 85, 247, 0.2), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cpath d='M70 10l18 30-18 30-18-30zM20 70l30 18-30 18-30-18zM70 130l-18-30 18-30 18 30zM130 70l-30-18 30-18 30 18z' stroke='rgba(244,114,182,0.45)' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  opacity: 0.6;
+  animation: sigilSpin 20s linear infinite;
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 70% 30%, rgba(16, 185, 129, 0.12), transparent 50%),
+    radial-gradient(circle at 30% 70%, rgba(168, 85, 247, 0.12), transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Ccircle cx='12' cy='12' r='2' fill='rgba(34,211,238,0.25)'/%3E%3Ccircle cx='70' cy='40' r='2' fill='rgba(16,185,129,0.25)'/%3E%3Ccircle cx='40' cy='70' r='2' fill='rgba(168,85,247,0.25)'/%3E%3C/svg%3E");
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+@keyframes arcaneFlicker {
+  0% { opacity: 0.65; }
+  40% { opacity: 0.9; }
+  60% { opacity: 0.5; }
+  100% { opacity: 0.75; }
+}
+
+@keyframes wardPulse {
+  0% { opacity: 0.5; letter-spacing: 6px; }
+  50% { opacity: 0.85; letter-spacing: 8px; }
+  100% { opacity: 0.6; letter-spacing: 6px; }
+}
+
+@keyframes arcaneDrift {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(0); opacity: 0.2; }
+  50% { opacity: 0.6; }
+  100% { transform: translateY(560px); opacity: 0.2; }
+}
+
+@keyframes graffitiPulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.85; }
+  100% { opacity: 0.5; }
+}
+
+@keyframes sparkle {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.95; }
+  100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+@keyframes sigilSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .nav {
@@ -26,6 +244,32 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
+}
+
+.navActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navLinks {
+  display: inline-flex;
+  gap: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(8, 10, 24, 0.6);
+}
+
+.navLink {
+  color: rgba(245, 245, 247, 0.7);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.navLink:hover {
+  color: #f5f5f7;
 }
 
 .logo {
@@ -77,14 +321,25 @@
   width: 400px;
   height: 400px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--blue) 0%, transparent 70%);
-  opacity: 0.15;
-  filter: blur(80px);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.45) 0%, transparent 70%);
+  opacity: 0.2;
+  filter: blur(90px);
   top: -200px;
   left: 50%;
   transform: translateX(-50%);
   pointer-events: none;
   z-index: 0;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(120deg, rgba(124, 58, 237, 0.08), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M24 20l24 24M24 44l24-24M80 76l20 20M80 96l20-20' stroke='rgba(147,197,253,0.18)' stroke-width='2'/%3E%3C/svg%3E");
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .heroContent {
@@ -129,13 +384,39 @@
 }
 
 .searchForm {
-  background: var(--bg-glass);
+  background: rgba(12, 10, 20, 0.78);
   backdrop-filter: saturate(180%) blur(30px);
   -webkit-backdrop-filter: saturate(180%) blur(30px);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: var(--radius-2xl);
   padding: var(--space-6);
-  box-shadow: var(--shadow-3);
+  box-shadow: 0 16px 40px rgba(7, 10, 24, 0.5);
+  position: relative;
+}
+
+.searchForm::before,
+.searchForm::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.8);
+  animation: sparkle 4s ease-in-out infinite;
+}
+
+.searchForm::before {
+  top: -6px;
+  left: 16px;
+}
+
+.searchForm::after {
+  bottom: -6px;
+  right: 22px;
+  background: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 18px rgba(168, 85, 247, 0.8);
+  animation-delay: 1.6s;
 }
 
 .searchForm:focus-within {

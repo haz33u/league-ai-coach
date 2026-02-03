@@ -3,6 +3,7 @@ Ranked API endpoints - ранковая информация
 Гибридный подход: LCU API + Riot API + Match History
 """
 import httpx
+import os
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.exc import OperationalError
 from typing import Dict, Any, Optional, List
@@ -15,6 +16,7 @@ from app import crud
 
 riot_api = RiotAPIService()
 router = APIRouter()
+ENABLE_LCU = os.getenv("ENABLE_LCU", "false").lower() in ("1", "true", "yes")
 
 
 # Маппинг платформ на регионы
@@ -333,13 +335,14 @@ async def get_ranked_by_name(
     tag_line: str, 
     region: str = "europe", 
     platform: str = "ru",
+    use_lcu: bool = False,
     db: Session = Depends(get_db)
 ):
     """
     Получить ранковую информацию по имени игрока
     
     Приоритет методов:
-    1. LCU API (если League Client запущен) - точный tier/rank/LP
+    1. LCU API (только если включено и запрошено) - точный tier/rank/LP
     2. Riot API Apex Tiers (Master+)
     3. Riot API League Entries (Bronze-Diamond)
     4. Match History Fallback
@@ -377,8 +380,8 @@ async def get_ranked_by_name(
         except OperationalError:
             player = None
         
-        # 3. МЕТОД 1: Попытка получить из LCU (приоритет!)
-        lcu_data = await get_ranked_from_lcu()
+        # 3. МЕТОД 1: LCU (только если явно включено)
+        lcu_data = await get_ranked_from_lcu() if (use_lcu and ENABLE_LCU) else None
         
         if lcu_data and lcu_data.get("ranked_solo"):
             # 💾 Сохранение ranked stats из LCU

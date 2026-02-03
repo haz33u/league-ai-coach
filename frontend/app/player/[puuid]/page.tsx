@@ -335,7 +335,7 @@ export default function PlayerPage() {
               </div>
             </div>
 
-            <div className={`${styles.statCard} ${styles.orange}`}>
+            <div className={`${styles.statCard} ${styles.rankTierCard}`}>
               <div className={styles.cardInner}>
                 <div className={`${styles.iconWrapperLarge} ${styles.rankIconWrapper}`}>
                   <div className={styles.rankFrameLarge}>
@@ -440,6 +440,51 @@ export default function PlayerPage() {
                     <h3>{focus.title}</h3>
                     <p className={styles.learningReason}>{focus.reason}</p>
                     <p className={styles.learningAction}>{focus.action}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.gridSplit}>
+            <div className={styles.glassPanel}>
+              <h2 className={styles.sectionTitle}>Coaching Recap</h2>
+              <div className={styles.learningList}>
+                {(analysis.coaching_recap || []).map((item) => (
+                  <div key={item.title} className={styles.learningItem}>
+                    <h3>{item.title}</h3>
+                    <p className={styles.learningReason}>{item.reason}</p>
+                    <p className={styles.learningAction}>{item.action}</p>
+                  </div>
+                ))}
+                {!analysis.coaching_recap?.length && (
+                  <p className={styles.emptyNote}>No critical issues detected in recent matches.</p>
+                )}
+              </div>
+            </div>
+            <div className={styles.glassPanel}>
+              <h2 className={styles.sectionTitle}>Match Turning Points</h2>
+              <div className={styles.turningPointsList}>
+                {matches.slice(0, 3).map((match) => (
+                  <div key={match.match_id} className={styles.turningPointsItem}>
+                    <div className={styles.turningHeader}>
+                      <span>{match.champion}</span>
+                      <span className={styles.turningMeta}>{queueLabel(match.queue_id)}</span>
+                    </div>
+                    <div className={styles.turningRow}>
+                      {(match as any).timeline?.turning_points?.length ? (
+                        (match as any).timeline.turning_points.map((point: any, idx: number) => (
+                          <div key={`${match.match_id}-${idx}`} className={styles.turningPoint}>
+                            <span className={styles.turningTime}>{point.time_min}m</span>
+                            <span className={point.impact === 'negative' ? styles.turningNegative : styles.turningPositive}>
+                              {point.label}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className={styles.emptyNote}>No timeline highlights found.</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

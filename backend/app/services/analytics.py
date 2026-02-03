@@ -380,13 +380,80 @@ def build_learning_path(analysis: Dict[str, Any]) -> Dict[str, Any]:
         focuses.append({
             "title": "Consistency",
             "reason": "Core metrics look solid.",
-            "action": "Maintain form and refine champion pool.",
+            "action": "Maintain form and review mistakes after losses.",
+        })
+        focuses.append({
+            "title": "Objective timing",
+            "reason": "Push small edges even in winning games.",
+            "action": "Track spawn timers and plan vision 45s before objectives.",
+        })
+        focuses.append({
+            "title": "Champion pool depth",
+            "reason": "Strong fundamentals allow higher-impact picks.",
+            "action": "Add 1–2 meta champs that fit your role identity.",
         })
 
     return {
         "main_role": main_role,
         "focuses": focuses[:3],
     }
+
+
+def build_coaching_recap(analysis: Dict[str, Any]) -> List[Dict[str, str]]:
+    performance = analysis.get("performance", {})
+    recap: List[Dict[str, str]] = []
+
+    cs_per_min = performance.get("avg_cs_per_min", 0) or 0
+    vision_per_min = performance.get("avg_vision_per_min", 0) or 0
+    kill_participation = performance.get("avg_kill_participation", 0) or 0
+    avg_kda = performance.get("avg_kda", 0) or 0
+
+    if cs_per_min < 6:
+        recap.append(
+            {
+                "title": "CS efficiency",
+                "reason": f"Average CS/min is {cs_per_min:.1f}.",
+                "action": "Target 7+ CS/min in stable lanes and avoid unnecessary roams.",
+            }
+        )
+
+    if vision_per_min < 1.0:
+        recap.append(
+            {
+                "title": "Vision control",
+                "reason": f"Vision/min is {vision_per_min:.2f}.",
+                "action": "Place control wards on resets and sweep before objectives.",
+            }
+        )
+
+    if kill_participation < 0.45:
+        recap.append(
+            {
+                "title": "Team fight impact",
+                "reason": f"Kill participation is {kill_participation:.2f}.",
+                "action": "Group earlier for major objectives and mirror strong side plays.",
+            }
+        )
+
+    if avg_kda < 2.5:
+        recap.append(
+            {
+                "title": "Survivability",
+                "reason": f"Average KDA is {avg_kda:.2f}.",
+                "action": "Track enemy cooldowns before committing and avoid over‑extending.",
+            }
+        )
+
+    if not recap:
+        recap.append(
+            {
+                "title": "Clean execution",
+                "reason": "No critical gaps detected in recent matches.",
+                "action": "Pick one metric (CS/min or vision/min) and push it +10%.",
+            }
+        )
+
+    return recap[:4]
 
 
 def _role_thresholds(role: str) -> Dict[str, float]:

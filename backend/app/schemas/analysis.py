@@ -141,6 +141,12 @@ class LearningPath(BaseModel):
     focuses: List[LearningFocus]
 
 
+class CoachingInsight(BaseModel):
+    title: str
+    reason: str
+    action: str
+
+
 class EarlyGameSummary(BaseModel):
     tracked_matches: int
     avg_early_kills: float
@@ -159,6 +165,7 @@ class AnalysisResponse(BaseModel):
     recent_matches: List[RecentMatch]
     dna: Optional[PlayerDNA] = None
     learning_path: Optional[LearningPath] = None
+    coaching_recap: Optional[List[CoachingInsight]] = None
     early_game: Optional[EarlyGameSummary] = None
 
 

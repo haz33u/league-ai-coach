@@ -95,6 +95,7 @@ export interface AnalysisResponse {
     main_role: string;
     focuses: { title: string; reason: string; action: string }[];
   };
+  coaching_recap?: { title: string; reason: string; action: string }[];
   early_game?: {
     tracked_matches: number;
     avg_early_kills: number;
@@ -276,6 +277,6 @@ export async function getRankedByName(
   };
 }
 
-export async function getLeaderboard(limit: number = 10) {
-  return fetchJson<any[]>(`${BACKEND_URL}/api/players/leaderboard/?limit=${limit}`);
+export async function getLeaderboard(platform: string = 'euw1', limit: number = 50) {
+  return fetchJson<any>(`${BACKEND_URL}/api/leaderboard?platform=${platform}&limit=${limit}`);
 }
