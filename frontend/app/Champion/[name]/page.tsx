@@ -81,7 +81,7 @@ const getDefaultChampionData = (name: string): ChampionStats => ({
 });
 
 // Mock builds (генерируются динамически)
-const generateBuilds = (championName: string) => {
+const generateBuilds = (_championName: string) => {
   const items = [
     'Eclipse', 'Trinity Force', 'Black Cleaver', 'Death Dance', 
     'Sterak Gage', 'Guardian Angel', 'Maw of Malmortius',
@@ -96,7 +96,7 @@ const generateBuilds = (championName: string) => {
 };
 
 // Mock runes (генерируются динамически)
-const generateRunes = (championName: string) => {
+const generateRunes = (_championName: string) => {
   const runes = [
     'Conqueror', 'Electrocute', 'Dark Harvest', 'Phase Rush',
     'Grasp of the Undying', 'Aftershock', 'Arcane Comet', 'Press the Attack'

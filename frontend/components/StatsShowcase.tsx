@@ -70,14 +70,11 @@ const generateStats = (): StatCard[] => {
 export default function StatsShowcase() {
   const [stats, setStats] = useState<StatCard[]>([]);
   const [isVisible, setIsVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     // Симуляция загрузки данных с League API
-    setIsLoading(true);
     const timer = setTimeout(() => {
       setStats(generateStats());
-      setIsLoading(false);
       setTimeout(() => setIsVisible(true), 50);
     }, 300);
     return () => clearTimeout(timer);

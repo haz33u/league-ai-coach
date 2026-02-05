@@ -138,4 +138,4 @@ if (process.env.NODE_ENV === 'development') {
   }, 60 * 1000);
 }
 
-export type SimpleCache = typeof cache;
+export type SimpleCacheInstance = typeof cache;

@@ -94,6 +94,7 @@ export default function HomePage() {
             <div className={styles.navLinks}>
               <a href="/" className={styles.navLink}>Home</a>
               <a href="/leaderboard" className={styles.navLink}>Leaderboard</a>
+              <a href="/demo" className={styles.navLink}>Demo</a>
             </div>
             <ThemeToggle />
           </div>

@@ -29,6 +29,9 @@ export default function RootLayout({
               <div className="footer-content">
                 <span>Nexus Oracle © 2026. Not endorsed by Riot Games.</span>
                 <div className="footer-links">
+                  <a href="/demo">Demo</a>
+                  <a href="/privacy">Privacy</a>
+                  <a href="/terms">Terms</a>
                   <a href="https://www.riotgames.com" target="_blank" rel="noreferrer">
                     Riot Games
                   </a>

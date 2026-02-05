@@ -2,14 +2,19 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: [
-      'ddragon.leagueoflegends.com',
-      'raw.communitydragon.org',
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ddragon.leagueoflegends.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'raw.communitydragon.org',
+      },
     ],
   },
   compress: true,
   poweredByHeader: false,
-  swcMinify: true,
 };
 
 module.exports = nextConfig;

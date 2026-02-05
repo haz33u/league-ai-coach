@@ -6,7 +6,6 @@ interface LoadingSkeletonProps {
   type?: 'card' | 'text' | 'avatar' | 'button' | 'input';
   count?: number;
   width?: string;
-  height?: string;
 }
 
 export function LoadingCard() {
@@ -59,7 +58,6 @@ export default function LoadingSkeleton({
   type = 'card',
   count = 1,
   width = '100%',
-  height = '24px',
 }: LoadingSkeletonProps) {
   if (type === 'card') {
     return (
