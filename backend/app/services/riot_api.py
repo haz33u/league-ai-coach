@@ -51,23 +51,23 @@ class RiotAPIService:
         normalized = self._normalize_region(region, platform)
         return self.base_url.replace("europe", normalized)
 
-    PLATFORM_HOST = {
-    "ru": "ru.api.riotgames.com",
-    "euw1": "euw1.api.riotgames.com",
-    "eun1": "eun1.api.riotgames.com",
-    "tr1": "tr1.api.riotgames.com",
-    "na1": "na1.api.riotgames.com",
-    "br1": "br1.api.riotgames.com",
-    "la1": "la1.api.riotgames.com",
-    "la2": "la2.api.riotgames.com",
-    "kr": "kr.api.riotgames.com",
-    "jp1": "jp1.api.riotgames.com",
-}
+     PLATFORM_HOST = {
+        "ru": "ru.api.riotgames.com",
+        "euw1": "euw1.api.riotgames.com",
+        "eun1": "eun1.api.riotgames.com",
+        "tr1": "tr1.api.riotgames.com",
+        "na1": "na1.api.riotgames.com",
+        "br1": "br1.api.riotgames.com",
+        "la1": "la1.api.riotgames.com",
+        "la2": "la2.api.riotgames.com",
+        "kr": "kr.api.riotgames.com",
+        "jp1": "jp1.api.riotgames.com",
+    }
 
-def _platform_base(self, platform: str) -> str:
-    key = (platform or "euw1").lower()
-    host = PLATFORM_HOST.get(key, f"{key}.api.riotgames.com")
-    return f"https://{host}"
+    def _platform_base(self, platform: str) -> str:
+        key = (platform or "euw1").lower()
+        host = self.PLATFORM_HOST.get(key, f"{key}.api.riotgames.com")
+        return f"https://{host}"
     
     async def get_account_by_riot_id(
         self, 
