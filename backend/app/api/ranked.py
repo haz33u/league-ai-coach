@@ -106,8 +106,8 @@ async def get_ranked_from_lcu() -> Optional[Dict[str, Any]]:
 
 
 async def find_player_in_apex_tiers(
-    puuid: str, 
-    platform: str, 
+    summoner_id: str,
+    platform: str,
     api_key: str
 ) -> Optional[Dict[str, Any]]:
     """
@@ -140,7 +140,7 @@ async def find_player_in_apex_tiers(
                 entries = league_data.get("entries", [])
                 
                 for entry in entries:
-                    if entry.get("summonerId") == puuid or entry.get("puuid") == puuid:
+                    if entry.get("summonerId") == summoner_id:
                         return {
                             "tier": tier,
                             "rank": "I",
@@ -431,8 +431,10 @@ async def get_ranked_by_name(
             }
         
         # 4. МЕТОД 2: Apex Tiers
-        apex_rank = await find_player_in_apex_tiers(
-            puuid=puuid,
+        apex_rank = None
+        if summoner_id:
+         apex_rank = await find_player_in_apex_tiers(
+            summoner_id=summoner_id,
             platform=platform,
             api_key=riot_api.api_key
         )
