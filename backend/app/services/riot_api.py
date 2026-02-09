@@ -3,9 +3,12 @@ Riot API Service
 """
 import httpx
 from typing import Dict, Any, Optional
+import logging
 
 from app.config import settings
 from app.services.cache import TTLCache
+
+logger = logging.getLogger(__name__)
 
 
 class RiotAPIError(Exception):
@@ -30,6 +33,7 @@ class RiotAPIService:
         "br1": "americas",
         "la1": "americas",
         "la2": "americas",
+        "oc1": "sea",
         "kr": "asia",
         "jp1": "asia",
     }
@@ -43,17 +47,20 @@ class RiotAPIService:
         "br1": "br1.api.riotgames.com",
         "la1": "la1.api.riotgames.com",
         "la2": "la2.api.riotgames.com",
+        "oc1": "oc1.api.riotgames.com",
         "kr": "kr.api.riotgames.com",
         "jp1": "jp1.api.riotgames.com",
     }
 
     def __init__(self):
         self.api_key = settings.riot_api_key
-        self.base_url = settings.riot_api_base_url
+        if not self.api_key:
+            raise ValueError("RIOT_API_KEY is not configured")
         self.headers = {"X-Riot-Token": self.api_key}
         self.cache = TTLCache(default_ttl_seconds=180, max_size=2048)
 
     def _normalize_region(self, region: str, platform: Optional[str] = None) -> str:
+        """Normalize region to one of the regional routing values"""
         region = (region or "").lower()
         platform = (platform or "").lower()
 
@@ -66,13 +73,56 @@ class RiotAPIService:
         return "europe"
 
     def _regional_base(self, region: str, platform: Optional[str] = None) -> str:
+        """Get regional API base URL (for Account-v1, Match-v5 endpoints)"""
         normalized = self._normalize_region(region, platform)
-        return self.base_url.replace("europe", normalized)
+        return f"https://{normalized}.api.riotgames.com"
 
     def _platform_base(self, platform: str) -> str:
+        """Get platform API base URL (for Summoner-v4, League-v4 endpoints)"""
         key = (platform or "euw1").lower()
         host = self.PLATFORM_HOST.get(key, f"{key}.api.riotgames.com")
         return f"https://{host}"
+
+    async def _make_request(
+        self,
+        url: str,
+        cache_key: Optional[str] = None,
+        cache_ttl: int = 300,
+        client: Optional[httpx.AsyncClient] = None,
+        timeout: float = 10.0,
+    ) -> Dict[str, Any]:
+        """Make HTTP request with caching and error handling"""
+        if cache_key:
+            cached = self.cache.get(cache_key)
+            if cached:
+                return cached
+
+        try:
+            if client:
+                response = await client.get(url, headers=self.headers, timeout=timeout)
+            else:
+                async with httpx.AsyncClient() as session:
+                    response = await session.get(url, headers=self.headers, timeout=timeout)
+
+            if response.status_code == 200:
+                data = response.json()
+                if cache_key:
+                    self.cache.set(cache_key, data, ttl_seconds=cache_ttl)
+                return data
+            elif response.status_code == 404:
+                raise RiotAPIError(404, "Resource not found")
+            elif response.status_code == 403:
+                raise RiotAPIError(403, "Forbidden - Check API key")
+            elif response.status_code == 429:
+                raise RiotAPIError(429, "Rate limit exceeded")
+            else:
+                raise RiotAPIError(response.status_code, response.text)
+        except httpx.TimeoutException:
+            logger.error(f"Timeout requesting {url}")
+            raise RiotAPIError(504, "Request timeout")
+        except httpx.RequestError as e:
+            logger.error(f"Request error for {url}: {e}")
+            raise RiotAPIError(500, f"Request failed: {str(e)}")
 
     async def get_account_by_riot_id(
         self,
@@ -86,20 +136,7 @@ class RiotAPIService:
         url = f"{regional_base}{endpoint}"
 
         cache_key = f"account:{region}:{game_name}:{tag_line}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=600)
-                return data
-            if response.status_code == 404:
-                raise RiotAPIError(404, f"Account {game_name}#{tag_line} not found")
-            raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=600)
 
     async def get_account_by_puuid(
         self,
@@ -114,23 +151,7 @@ class RiotAPIService:
         url = f"{regional_base}{endpoint}"
 
         cache_key = f"account:puuid:{region}:{puuid}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        if client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-        else:
-            async with httpx.AsyncClient() as session:
-                response = await session.get(url, headers=self.headers, timeout=10.0)
-
-        if response.status_code == 200:
-            data = response.json()
-            self.cache.set(cache_key, data, ttl_seconds=600)
-            return data
-        if response.status_code == 404:
-            raise RiotAPIError(404, "Account not found")
-        raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=600, client=client)
 
     async def get_summoner_by_puuid(
         self,
@@ -143,20 +164,7 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"summoner:{platform}:{puuid}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=300)
-                return data
-            if response.status_code == 404:
-                raise RiotAPIError(404, "Summoner not found")
-            raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=300)
 
     async def get_summoner_by_id(
         self,
@@ -170,48 +178,22 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"summoner:id:{platform}:{summoner_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        if client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-        else:
-            async with httpx.AsyncClient() as session:
-                response = await session.get(url, headers=self.headers, timeout=10.0)
-
-        if response.status_code == 200:
-            data = response.json()
-            self.cache.set(cache_key, data, ttl_seconds=300)
-            return data
-        if response.status_code == 404:
-            raise RiotAPIError(404, "Summoner not found")
-        raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=300, client=client)
 
     async def get_match_history(
         self,
         puuid: str,
         region: str = "europe",
         count: int = 20,
+        start: int = 0,
     ) -> list:
         """Получить match history"""
         regional_base = self._regional_base(region)
-        endpoint = f"/lol/match/v5/matches/by-puuid/{puuid}/ids?start=0&count={count}"
+        endpoint = f"/lol/match/v5/matches/by-puuid/{puuid}/ids?start={start}&count={count}"
         url = f"{regional_base}{endpoint}"
 
-        cache_key = f"matches:{region}:{puuid}:{count}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=120)
-                return data
-            raise RiotAPIError(response.status_code, response.text)
+        cache_key = f"matches:{region}:{puuid}:{start}:{count}"
+        return await self._make_request(url, cache_key, cache_ttl=120)
 
     async def get_match_details(
         self,
@@ -226,23 +208,7 @@ class RiotAPIService:
         url = f"{regional_base}{endpoint}"
 
         cache_key = f"match:{region}:{match_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        if client:
-            response = await client.get(url, headers=self.headers, timeout=15.0)
-        else:
-            async with httpx.AsyncClient() as session:
-                response = await session.get(url, headers=self.headers, timeout=15.0)
-
-        if response.status_code == 200:
-            data = response.json()
-            self.cache.set(cache_key, data, ttl_seconds=300)
-            return data
-        if response.status_code == 404:
-            raise RiotAPIError(404, f"Match {match_id} not found")
-        raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=300, client=client, timeout=15.0)
 
     async def get_match_timeline(
         self,
@@ -257,23 +223,7 @@ class RiotAPIService:
         url = f"{regional_base}{endpoint}"
 
         cache_key = f"timeline:{region}:{match_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        if client:
-            response = await client.get(url, headers=self.headers, timeout=15.0)
-        else:
-            async with httpx.AsyncClient() as session:
-                response = await session.get(url, headers=self.headers, timeout=15.0)
-
-        if response.status_code == 200:
-            data = response.json()
-            self.cache.set(cache_key, data, ttl_seconds=300)
-            return data
-        if response.status_code == 404:
-            raise RiotAPIError(404, f"Timeline {match_id} not found")
-        raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=300, client=client, timeout=15.0)
 
     async def get_league_entries(
         self,
@@ -286,19 +236,12 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"league:{platform}:{summoner_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=300)
-                return data
-            if response.status_code == 404:
+        try:
+            return await self._make_request(url, cache_key, cache_ttl=300)
+        except RiotAPIError as e:
+            if e.status_code == 404:
                 return []
-            raise RiotAPIError(response.status_code, response.text)
+            raise
 
     async def get_challenger_league(
         self,
@@ -311,17 +254,7 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"challenger:{platform}:{queue}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=60)
-                return data
-            raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=60)
 
     async def get_grandmaster_league(
         self,
@@ -334,17 +267,7 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"grandmaster:{platform}:{queue}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=60)
-                return data
-            raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=60)
 
     async def get_master_league(
         self,
@@ -357,17 +280,7 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"master:{platform}:{queue}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=60)
-                return data
-            raise RiotAPIError(response.status_code, response.text)
+        return await self._make_request(url, cache_key, cache_ttl=60)
 
     async def get_champion_mastery(
         self,
@@ -380,16 +293,9 @@ class RiotAPIService:
         url = f"{platform_base}{endpoint}"
 
         cache_key = f"mastery:{platform}:{summoner_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, timeout=10.0)
-            if response.status_code == 200:
-                data = response.json()
-                self.cache.set(cache_key, data, ttl_seconds=600)
-                return data
-            if response.status_code == 404:
+        try:
+            return await self._make_request(url, cache_key, cache_ttl=600)
+        except RiotAPIError as e:
+            if e.status_code == 404:
                 return []
-            raise RiotAPIError(response.status_code, response.text)
+            raise
