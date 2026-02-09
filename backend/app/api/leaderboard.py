@@ -1,13 +1,15 @@
 from typing import Any, Dict, List
 import asyncio
 import httpx
+import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 
-from app.services.riot_api import RiotAPIService
+from app.services.riot_api import RiotAPIService, RiotAPIError
 
 router = APIRouter()
 riot_api = RiotAPIService()
+logger = logging.getLogger(__name__)
 
 REGION_MAP = {
     "euw1": "europe",
@@ -18,7 +20,7 @@ REGION_MAP = {
     "br1": "americas",
     "la1": "americas",
     "la2": "americas",
-    "oc1": "americas",
+    "oc1": "sea",
     "kr": "asia",
     "jp1": "asia",
 }
@@ -31,24 +33,44 @@ async def get_leaderboard(
     limit: int = Query(50, ge=1, le=200, description="Number of entries to return"),
     debug: bool = Query(False, description="Include debug info"),
 ) -> Dict[str, Any]:
-    league = await riot_api.get_challenger_league(platform=platform, queue=queue)
+    """
+    Get challenger/grandmaster/master leaderboard for a platform.
+    Returns detailed player information including Riot IDs and profile icons.
+    """
+    try:
+        league = await riot_api.get_challenger_league(platform=platform, queue=queue)
+    except RiotAPIError as e:
+        logger.error(f"Failed to fetch challenger league: {e}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error fetching challenger league: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
     entries = league.get("entries", [])
     entries_sorted = sorted(entries, key=lambda e: e.get("leaguePoints", 0), reverse=True)
     combined_entries = [(entry, "CHALLENGER") for entry in entries_sorted]
 
+    # Добавляем Grandmaster если не хватает
     if len(combined_entries) < limit:
-        gm_league = await riot_api.get_grandmaster_league(platform=platform, queue=queue)
-        gm_entries = sorted(
-            gm_league.get("entries", []), key=lambda e: e.get("leaguePoints", 0), reverse=True
-        )
-        combined_entries.extend([(entry, "GRANDMASTER") for entry in gm_entries])
+        try:
+            gm_league = await riot_api.get_grandmaster_league(platform=platform, queue=queue)
+            gm_entries = sorted(
+                gm_league.get("entries", []), key=lambda e: e.get("leaguePoints", 0), reverse=True
+            )
+            combined_entries.extend([(entry, "GRANDMASTER") for entry in gm_entries])
+        except RiotAPIError as e:
+            logger.warning(f"Failed to fetch grandmaster league: {e}")
 
+    # Добавляем Master если не хватает
     if len(combined_entries) < limit:
-        master_league = await riot_api.get_master_league(platform=platform, queue=queue)
-        master_entries = sorted(
-            master_league.get("entries", []), key=lambda e: e.get("leaguePoints", 0), reverse=True
-        )
-        combined_entries.extend([(entry, "MASTER") for entry in master_entries])
+        try:
+            master_league = await riot_api.get_master_league(platform=platform, queue=queue)
+            master_entries = sorted(
+                master_league.get("entries", []), key=lambda e: e.get("leaguePoints", 0), reverse=True
+            )
+            combined_entries.extend([(entry, "MASTER") for entry in master_entries])
+        except RiotAPIError as e:
+            logger.warning(f"Failed to fetch master league: {e}")
 
     combined_entries = combined_entries[:limit]
 
@@ -59,28 +81,39 @@ async def get_leaderboard(
     raw_entries = [entry for entry, _ in combined_entries[:min(limit, 3)]] if debug else []
 
     async with httpx.AsyncClient() as client:
-        sem = asyncio.Semaphore(3)
+        # Ограничение одновременных запросов
+        sem = asyncio.Semaphore(5)
 
-        async def _fetch_summoner_by_puuid(puuid: str):
+        async def _fetch_summoner_by_puuid(puuid: str, retry_count: int = 2):
             if not puuid:
                 return None
             async with sem:
-                for _ in range(2):
+                for attempt in range(retry_count):
                     try:
                         return await riot_api.get_summoner_by_puuid(
                             puuid=puuid, platform=platform
                         )
+                    except RiotAPIError as exc:
+                        if exc.status_code == 404:
+                            return None
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(0.2 * (attempt + 1))
+                        else:
+                            if debug:
+                                return {"_error": str(exc)}
+                            return None
                     except Exception as exc:
+                        logger.error(f"Unexpected error fetching summoner {puuid}: {exc}")
                         if debug:
                             return {"_error": str(exc)}
-                        await asyncio.sleep(0.15)
+                        return None
                 return None
 
-        async def _fetch_account(puuid: str):
+        async def _fetch_account(puuid: str, retry_count: int = 2):
             if not puuid:
                 return None
             async with sem:
-                for _ in range(2):
+                for attempt in range(retry_count):
                     try:
                         return await riot_api.get_account_by_puuid(
                             puuid=puuid,
@@ -88,28 +121,42 @@ async def get_leaderboard(
                             platform=platform,
                             client=client,
                         )
+                    except RiotAPIError as exc:
+                        if exc.status_code == 404:
+                            return None
+                        if attempt < retry_count - 1:
+                            await asyncio.sleep(0.2 * (attempt + 1))
+                        else:
+                            if debug:
+                                return {"_error": str(exc)}
+                            return None
                     except Exception as exc:
+                        logger.error(f"Unexpected error fetching account {puuid}: {exc}")
                         if debug:
                             return {"_error": str(exc)}
-                        await asyncio.sleep(0.15)
+                        return None
                 return None
 
+        # Получаем summoner данные
         summoner_tasks = [
             _fetch_summoner_by_puuid(entry.get("puuid", "")) for entry, _ in combined_entries
         ]
-        summoner_results = await asyncio.gather(*summoner_tasks, return_exceptions=True)
+        summoner_results = await asyncio.gather(*summoner_tasks, return_exceptions=False)
+        
+        # Получаем account данные
         account_tasks = []
         account_indexes = []
         accounts: List[Dict[str, Any]] = [{} for _ in summoner_results]
-        for idx, summoner in enumerate(summoner_results):
-            entry_puuid = combined_entries[idx][0].get("puuid")
+        
+        for idx, (entry, _) in enumerate(combined_entries):
+            entry_puuid = entry.get("puuid")
             if entry_puuid:
                 account_tasks.append(_fetch_account(entry_puuid))
                 account_indexes.append(idx)
 
         account_error_samples = []
         if account_tasks:
-            account_results = await asyncio.gather(*account_tasks, return_exceptions=True)
+            account_results = await asyncio.gather(*account_tasks, return_exceptions=False)
             for idx, account in zip(account_indexes, account_results):
                 if isinstance(account, dict):
                     if account.get("_error"):
@@ -118,17 +165,19 @@ async def get_leaderboard(
                             account_error_samples.append(account.get("_error"))
                     else:
                         accounts[idx] = account
-                else:
+                elif account is None:
                     account_errors += 1
+                    
         summoner_error_samples = []
         for summoner in summoner_results:
-            if not isinstance(summoner, dict):
+            if summoner is None:
                 summoner_errors += 1
-            elif summoner.get("_error"):
+            elif isinstance(summoner, dict) and summoner.get("_error"):
                 summoner_errors += 1
                 if debug and len(summoner_error_samples) < 3:
                     summoner_error_samples.append(summoner.get("_error"))
 
+    # Формируем результат
     players: List[Dict[str, Any]] = []
     for (entry, tier), summoner, account in zip(combined_entries, summoner_results, accounts):
         wins = entry.get("wins", 0)
@@ -138,10 +187,12 @@ async def get_leaderboard(
         puuid = entry.get("puuid")
         summoner_name = entry.get("summonerName", "Unknown")
         riot_id = None
-        if isinstance(summoner, dict):
+        
+        if isinstance(summoner, dict) and not summoner.get("_error"):
             profile_icon_id = summoner.get("profileIconId")
             summoner_name = summoner.get("name", summoner_name)
-        if isinstance(account, dict):
+            
+        if isinstance(account, dict) and not account.get("_error"):
             game_name = account.get("gameName")
             tag_line = account.get("tagLine")
             if game_name and tag_line:
@@ -171,6 +222,7 @@ async def get_leaderboard(
         "name": league.get("name", "Challenger"),
         "players": players,
     }
+    
     if debug:
         response["debug"] = {
             "summoner_errors": summoner_errors,
@@ -179,4 +231,5 @@ async def get_leaderboard(
             "account_error_samples": account_error_samples,
             "raw_entries": raw_entries,
         }
+        
     return response
