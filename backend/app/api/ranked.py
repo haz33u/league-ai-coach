@@ -1,25 +1,25 @@
 """
-Ranked API endpoints - ранковая информация
-Гибридный подход: LCU API + Riot API + Match History
+Ranked API endpoints - ранковая информация (SOLO focus)
+Гибрид: LCU (optional) + Apex SOLO by PUUID + (если доступно) League entries by summonerId + match-history fallback.
 """
-import httpx
+from __future__ import annotations
+
 import os
+import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.exc import OperationalError
-from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional, List
+
 from app.services.riot_api import RiotAPIService, RiotAPIError
 from app.api.lcu import get_lcu_connection_info
 from app.database import get_db
 from app import crud
 
-
-riot_api = RiotAPIService()
 router = APIRouter()
+riot_api = RiotAPIService()
 ENABLE_LCU = os.getenv("ENABLE_LCU", "false").lower() in ("1", "true", "yes")
 
-
-# Маппинг платформ на регионы
 PLATFORM_TO_REGION = {
     "ru": "europe",
     "euw1": "europe",
@@ -33,158 +33,104 @@ PLATFORM_TO_REGION = {
     "jp1": "asia",
 }
 
-TIERS = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND"]
-DIVISIONS = ["I", "II", "III", "IV"]
-APEX_TIERS = ["MASTER", "GRANDMASTER", "CHALLENGER"]
+APEX_TIERS = ["CHALLENGER", "GRANDMASTER", "MASTER"]
 
 
 async def get_ranked_from_lcu() -> Optional[Dict[str, Any]]:
-    """
-    Попытка получить ranked данные из LCU API (если League Client запущен)
-    """
     lcu_info = get_lcu_connection_info()
-    
     if not lcu_info:
         return None
-    
+
     url = f"{lcu_info['base_url']}/lol-ranked/v1/current-ranked-stats"
-    
     try:
         async with httpx.AsyncClient(verify=False) as client:
-            response = await client.get(
-                url,
-                headers={"Authorization": lcu_info["auth_header"]},
-                timeout=5.0
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                queues = data.get("queues", [])
-                
-                result = {
-                    "ranked_solo": None,
-                    "ranked_flex": None,
-                    "source": "LCU"
-                }
-                
-                for queue in queues:
-                    queue_type = queue.get("queueType")
-                    tier = queue.get("tier", "")
-                    
-                    if not tier or tier == "":
-                        continue
-                    
-                    wins = queue.get("wins", 0)
-                    losses = queue.get("losses", 0)
-                    total_games = wins + losses
-                    winrate = round((wins / total_games) * 100, 1) if total_games > 0 else 0
-                    
-                    queue_info = {
-                        "tier": tier,
-                        "rank": queue.get("division", "I"),
-                        "lp": queue.get("leaguePoints", 0),
-                        "wins": wins,
-                        "losses": losses,
-                        "total_games": total_games,
-                        "winrate": winrate,
-                        "veteran": False,
-                        "hot_streak": False,
-                        "series": None
-                    }
-                    
-                    if queue_type == "RANKED_SOLO_5x5":
-                        result["ranked_solo"] = queue_info
-                    elif queue_type == "RANKED_FLEX_SR":
-                        result["ranked_flex"] = queue_info
-                
-                return result
-    
+            r = await client.get(url, headers={"Authorization": lcu_info["auth_header"]}, timeout=5.0)
+        if r.status_code != 200:
+            return None
+
+        data = r.json()
+        queues = data.get("queues", [])
+        result = {"ranked_solo": None, "ranked_flex": None, "source": "LCU"}
+
+        for q in queues:
+            qt = q.get("queueType")
+            tier = q.get("tier") or ""
+            if not tier:
+                continue
+
+            wins = q.get("wins", 0)
+            losses = q.get("losses", 0)
+            total = wins + losses
+            winrate = round((wins / total) * 100, 1) if total > 0 else 0
+
+            info = {
+                "tier": tier,
+                "rank": q.get("division", "I"),
+                "lp": q.get("leaguePoints", 0),
+                "wins": wins,
+                "losses": losses,
+                "total_games": total,
+                "winrate": winrate,
+                "veteran": False,
+                "hot_streak": False,
+                "series": None,
+            }
+
+            if qt == "RANKED_SOLO_5x5":
+                result["ranked_solo"] = info
+            elif qt == "RANKED_FLEX_SR":
+                result["ranked_flex"] = info
+
+        return result
     except Exception:
         return None
-    
+
+
+async def find_apex_solo_by_puuid(puuid: str, platform: str) -> Optional[Dict[str, Any]]:
+    """SOLO Apex rank by PUUID via league lists."""
+    if not puuid:
+        return None
+
+    queue = "RANKED_SOLO_5x5"
+    sources = [
+        ("CHALLENGER", riot_api.get_challenger_league),
+        ("GRANDMASTER", riot_api.get_grandmaster_league),
+        ("MASTER", riot_api.get_master_league),
+    ]
+
+    for tier, getter in sources:
+        try:
+            league = await getter(platform=platform, queue=queue)
+            for e in league.get("entries", []):
+                if e.get("puuid") == puuid:
+                    return {
+                        "tier": tier,
+                        "rank": "I",
+                        "lp": e.get("leaguePoints", 0),
+                        "wins": e.get("wins", 0),
+                        "losses": e.get("losses", 0),
+                        "veteran": e.get("veteran", False),
+                        "hot_streak": e.get("hotStreak", False),
+                        "series": e.get("miniSeries"),
+                    }
+        except Exception:
+            continue
+
     return None
 
 
-async def find_player_in_apex_tiers(
-    summoner_id: str,
-    platform: str,
-    api_key: str
-) -> Optional[Dict[str, Any]]:
-    """
-    Поиск игрока в Apex tiers (Master/Grandmaster/Challenger)
-    """
-    platform_base = f"https://{platform}.api.riotgames.com"
-    
-    async with httpx.AsyncClient() as client:
-        for tier in APEX_TIERS:
-            try:
-                if tier == "CHALLENGER":
-                    endpoint = "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"
-                elif tier == "GRANDMASTER":
-                    endpoint = "/lol/league/v4/grandmasterleagues/by-queue/RANKED_SOLO_5x5"
-                elif tier == "MASTER":
-                    endpoint = "/lol/league/v4/masterleagues/by-queue/RANKED_SOLO_5x5"
-                
-                url = f"{platform_base}{endpoint}"
-                
-                response = await client.get(
-                    url,
-                    headers={"X-Riot-Token": api_key},
-                    timeout=10.0
-                )
-                
-                if response.status_code != 200:
-                    continue
-                
-                league_data = response.json()
-                entries = league_data.get("entries", [])
-                
-                for entry in entries:
-                    if entry.get("summonerId") == summoner_id:
-                        return {
-                            "tier": tier,
-                            "rank": "I",
-                            "lp": entry.get("leaguePoints", 0),
-                            "wins": entry.get("wins", 0),
-                            "losses": entry.get("losses", 0),
-                            "veteran": entry.get("veteran", False),
-                            "hot_streak": entry.get("hotStreak", False),
-                            "series": entry.get("miniSeries")
-                        }
-            
-            except Exception:
-                continue
-    
-    return None
-
-
-async def find_player_in_divisions(
-    summoner_id: str,
-    platform: str,
-    api_key: str
-) -> Optional[List[Dict[str, Any]]]:
-    """
-    Поиск игрока в обычных тирах через summoner ID
-    """
-    platform_base = f"https://{platform}.api.riotgames.com"
-    endpoint = f"/lol/league/v4/entries/by-summoner/{summoner_id}"
-    url = f"{platform_base}{endpoint}"
-    
+async def find_league_entries_by_summoner_id(summoner_id: str, platform: str) -> Optional[List[Dict[str, Any]]]:
+    """Standard path: league-v4 entries by encryptedSummonerId (if summoner_id exists)."""
+    platform_base = riot_api._platform_base(platform)
+    url = f"{platform_base}/lol/league/v4/entries/by-summoner/{summoner_id}"
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                headers={"X-Riot-Token": api_key},
-                timeout=10.0
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-    
+            r = await client.get(url, headers=riot_api.headers, timeout=10.0)
+        if r.status_code == 200:
+            return r.json()
+        return None
     except Exception:
-        pass
-    
-    return None
+        return None
 
 
 async def calculate_from_match_history(
@@ -194,178 +140,159 @@ async def calculate_from_match_history(
     tag_line: str,
     region: str,
     platform: str,
-    api_key: str
 ) -> Dict[str, Any]:
-    """
-    Fallback: вычисляем статистику из match history
-    """
+    """Fallback: ranked W/L from match history; tier/division/LP unavailable."""
     regional_routing = PLATFORM_TO_REGION.get(platform, region)
     regional_base = f"https://{regional_routing}.api.riotgames.com"
-    
-    match_endpoint = f"/lol/match/v5/matches/by-puuid/{puuid}/ids"
-    match_url = f"{regional_base}{match_endpoint}"
-    
+    url = f"{regional_base}/lol/match/v5/matches/by-puuid/{puuid}/ids"
+
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            match_url,
-            headers={"X-Riot-Token": api_key},
+        r = await client.get(
+            url,
+            headers=riot_api.headers,
             params={"type": "ranked", "count": 100},
-            timeout=15.0
+            timeout=15.0,
         )
-        
-        if response.status_code != 200:
-            return {
-                "player": {
-                    "game_name": game_name,
-                    "tag_line": tag_line,
-                    "puuid": puuid,
-                    "level": summoner_level
-                },
-                "ranked_solo": None,
-                "ranked_flex": None,
-                "note": "Unable to fetch ranked data"
-            }
-        
-        match_ids = response.json()
-        
-        if not match_ids:
-            return {
-                "player": {
-                    "game_name": game_name,
-                    "tag_line": tag_line,
-                    "puuid": puuid,
-                    "level": summoner_level
-                },
-                "ranked_solo": None,
-                "ranked_flex": None,
-                "note": "No ranked games found"
-            }
-        
-        solo_wins = 0
-        solo_losses = 0
-        flex_wins = 0
-        flex_losses = 0
-        
-        for match_id in match_ids[:50]:
-            try:
-                match_detail_url = f"{regional_base}/lol/match/v5/matches/{match_id}"
-                match_response = await client.get(
-                    match_detail_url,
-                    headers={"X-Riot-Token": api_key},
-                    timeout=10.0
-                )
-                
-                if match_response.status_code != 200:
-                    continue
-                
-                match_data = match_response.json()
-                queue_id = match_data["info"].get("queueId")
-                
-                for participant in match_data["info"]["participants"]:
-                    if participant["puuid"] == puuid:
-                        win = participant["win"]
-                        
-                        if queue_id == 420:
-                            if win:
-                                solo_wins += 1
-                            else:
-                                solo_losses += 1
-                        elif queue_id == 440:
-                            if win:
-                                flex_wins += 1
-                            else:
-                                flex_losses += 1
-                        break
-            
-            except Exception:
-                continue
-        
-        result = {
-            "player": {
-                "game_name": game_name,
-                "tag_line": tag_line,
-                "puuid": puuid,
-                "level": summoner_level
-            },
+
+    if r.status_code != 200:
+        return {
+            "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": summoner_level},
             "ranked_solo": None,
             "ranked_flex": None,
-            "note": "Ranked data calculated from match history (tier/rank/LP unavailable)"
+            "note": "Unable to fetch match history",
         }
-        
-        if solo_wins + solo_losses > 0:
-            total_solo = solo_wins + solo_losses
-            winrate = round((solo_wins / total_solo) * 100, 1)
-            
-            result["ranked_solo"] = {
-                "tier": "UNKNOWN",
-                "rank": "UNKNOWN",
-                "lp": None,
-                "wins": solo_wins,
-                "losses": solo_losses,
-                "total_games": total_solo,
-                "winrate": winrate,
-                "veteran": False,
-                "hot_streak": False,
-                "series": None
-            }
-        
-        if flex_wins + flex_losses > 0:
-            total_flex = flex_wins + flex_losses
-            winrate = round((flex_wins / total_flex) * 100, 1)
-            
-            result["ranked_flex"] = {
-                "tier": "UNKNOWN",
-                "rank": "UNKNOWN",
-                "lp": None,
-                "wins": flex_wins,
-                "losses": flex_losses,
-                "total_games": total_flex,
-                "winrate": winrate,
-                "veteran": False,
-                "hot_streak": False,
-                "series": None
-            }
-        
-        return result
+
+    match_ids = r.json()
+    if not match_ids:
+        return {
+            "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": summoner_level},
+            "ranked_solo": None,
+            "ranked_flex": None,
+            "note": "No ranked games found",
+        }
+
+    solo_w, solo_l = 0, 0
+    flex_w, flex_l = 0, 0
+
+    async with httpx.AsyncClient() as client:
+        for mid in match_ids[:50]:
+            try:
+                mr = await client.get(
+                    f"{regional_base}/lol/match/v5/matches/{mid}",
+                    headers=riot_api.headers,
+                    timeout=10.0,
+                )
+                if mr.status_code != 200:
+                    continue
+                m = mr.json()
+                qid = m.get("info", {}).get("queueId")
+                for p in m.get("info", {}).get("participants", []):
+                    if p.get("puuid") != puuid:
+                        continue
+                    win = bool(p.get("win"))
+                    if qid == 420:
+                        solo_w += 1 if win else 0
+                        solo_l += 0 if win else 1
+                    elif qid == 440:
+                        flex_w += 1 if win else 0
+                        flex_l += 0 if win else 1
+                    break
+            except Exception:
+                continue
+
+    out = {
+        "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": summoner_level},
+        "ranked_solo": None,
+        "ranked_flex": None,
+        "note": "Ranked stats from match history (tier/division/LP unavailable)",
+    }
+
+    if solo_w + solo_l > 0:
+        total = solo_w + solo_l
+        out["ranked_solo"] = {
+            "tier": "UNRANKED",
+            "rank": None,
+            "lp": None,
+            "wins": solo_w,
+            "losses": solo_l,
+            "total_games": total,
+            "winrate": round((solo_w / total) * 100, 1),
+            "veteran": False,
+            "hot_streak": False,
+            "series": None,
+        }
+
+    if flex_w + flex_l > 0:
+        total = flex_w + flex_l
+        out["ranked_flex"] = {
+            "tier": "UNRANKED",
+            "rank": None,
+            "lp": None,
+            "wins": flex_w,
+            "losses": flex_l,
+            "total_games": total,
+            "winrate": round((flex_w / total) * 100, 1),
+            "veteran": False,
+            "hot_streak": False,
+            "series": None,
+        }
+
+    return out
 
 
 @router.post("/by-name", response_model=Dict[str, Any])
 async def get_ranked_by_name(
-    game_name: str, 
-    tag_line: str, 
-    region: str = "europe", 
+    game_name: str,
+    tag_line: str,
+    region: str = "europe",
     platform: str = "ru",
     use_lcu: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Получить ранковую информацию по имени игрока
-    
-    Приоритет методов:
-    1. LCU API (только если включено и запрошено) - точный tier/rank/LP
-    2. Riot API Apex Tiers (Master+)
-    3. Riot API League Entries (Bronze-Diamond)
-    4. Match History Fallback
-    """
     try:
-        # 1. Получаем PUUID
-        account_data = await riot_api.get_account_by_riot_id(
-            game_name=game_name,
-            tag_line=tag_line,
-            region=region
-        )
-        puuid = account_data["puuid"]
-        
-        # 2. Получаем summoner данные
-        summoner_data = await riot_api.get_summoner_by_puuid(
-            puuid=puuid,
-            platform=platform
-        )
-        
-        summoner_level = summoner_data.get("summonerLevel", 0)
-        summoner_id = summoner_data.get("id")
-        
-        # 💾 Сохранение игрока в БД (если БД доступна)
+        # 1) RiotID -> PUUID
+        account = await riot_api.get_account_by_riot_id(game_name=game_name, tag_line=tag_line, region=region)
+        puuid = account["puuid"]
+
+        # 2) LCU first (optional)
+        lcu = await get_ranked_from_lcu() if (use_lcu and ENABLE_LCU) else None
+        if lcu and lcu.get("ranked_solo"):
+            return {
+                "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": None},
+                "ranked_solo": lcu["ranked_solo"],
+                "ranked_flex": lcu.get("ranked_flex"),
+                "data_source": "LCU",
+            }
+
+        # 3) Apex SOLO by PUUID (works even without summonerId)
+        apex = await find_apex_solo_by_puuid(puuid=puuid, platform=platform)
+        if apex:
+            total = apex["wins"] + apex["losses"]
+            winrate = round((apex["wins"] / total) * 100, 1) if total > 0 else 0
+            return {
+                "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": None},
+                "ranked_solo": {
+                    "tier": apex["tier"],
+                    "rank": apex["rank"],
+                    "lp": apex["lp"],
+                    "wins": apex["wins"],
+                    "losses": apex["losses"],
+                    "total_games": total,
+                    "winrate": winrate,
+                    "veteran": apex["veteran"],
+                    "hot_streak": apex["hot_streak"],
+                    "series": apex["series"],
+                },
+                "ranked_flex": None,
+                "data_source": "Riot API (Apex by PUUID)",
+            }
+
+        # 4) Summoner profile (may not include "id" in your current key policy)
+        summoner = await riot_api.get_summoner_by_puuid(puuid=puuid, platform=platform)
+        summoner_level = summoner.get("summonerLevel", 0)
+        summoner_id = summoner.get("id")
+
+        # DB write (optional; ignore if DB down)
         try:
             player = crud.get_or_create_player(
                 db=db,
@@ -375,198 +302,79 @@ async def get_ranked_by_name(
                 region=region,
                 platform=platform,
                 summoner_level=summoner_level,
-                profile_icon_id=summoner_data.get("profileIconId"),
+                profile_icon_id=summoner.get("profileIconId"),
             )
         except OperationalError:
             player = None
-        
-        # 3. МЕТОД 1: LCU (только если явно включено)
-        lcu_data = await get_ranked_from_lcu() if (use_lcu and ENABLE_LCU) else None
-        
-        if lcu_data and lcu_data.get("ranked_solo"):
-            # 💾 Сохранение ranked stats из LCU
-            if player:
-                try:
-                    crud.create_or_update_ranked_stats(
-                        db=db,
-                        player_id=player.id,
-                        queue_type="RANKED_SOLO_5x5",
-                        tier=lcu_data["ranked_solo"]["tier"],
-                        rank=lcu_data["ranked_solo"]["rank"],
-                        lp=lcu_data["ranked_solo"]["lp"],
-                        wins=lcu_data["ranked_solo"]["wins"],
-                        losses=lcu_data["ranked_solo"]["losses"],
-                        data_source="LCU",
-                    )
-                except OperationalError:
-                    pass
-            
-            if lcu_data.get("ranked_flex"):
-                if player:
-                    try:
-                        crud.create_or_update_ranked_stats(
-                            db=db,
-                            player_id=player.id,
-                            queue_type="RANKED_FLEX_SR",
-                            tier=lcu_data["ranked_flex"]["tier"],
-                            rank=lcu_data["ranked_flex"]["rank"],
-                            lp=lcu_data["ranked_flex"]["lp"],
-                            wins=lcu_data["ranked_flex"]["wins"],
-                            losses=lcu_data["ranked_flex"]["losses"],
-                            data_source="LCU",
-                        )
-                    except OperationalError:
-                        pass
-            
-            return {
-                "player": {
-                    "game_name": game_name,
-                    "tag_line": tag_line,
-                    "puuid": puuid,
-                    "level": summoner_level
-                },
-                "ranked_solo": lcu_data["ranked_solo"],
-                "ranked_flex": lcu_data.get("ranked_flex"),
-                "data_source": "LCU (Live Client)"
-            }
-        
-        # 4. МЕТОД 2: Apex Tiers
-        apex_rank = None
+
+        # 5) League entries if summonerId exists
         if summoner_id:
-         apex_rank = await find_player_in_apex_tiers(
-            summoner_id=summoner_id,
-            platform=platform,
-            api_key=riot_api.api_key
-        )
-        
-        if apex_rank:
-            # 💾 Сохранение apex rank
-            if player:
-                try:
-                    crud.create_or_update_ranked_stats(
-                        db=db,
-                        player_id=player.id,
-                        queue_type="RANKED_SOLO_5x5",
-                        tier=apex_rank["tier"],
-                        rank=apex_rank["rank"],
-                        lp=apex_rank["lp"],
-                        wins=apex_rank["wins"],
-                        losses=apex_rank["losses"],
-                        veteran=apex_rank["veteran"],
-                        hot_streak=apex_rank["hot_streak"],
-                        data_source="riot_api_apex",
-                    )
-                except OperationalError:
-                    pass
-            
-            total_games = apex_rank["wins"] + apex_rank["losses"]
-            winrate = round((apex_rank["wins"] / total_games) * 100, 1) if total_games > 0 else 0
-            
-            return {
-                "player": {
-                    "game_name": game_name,
-                    "tag_line": tag_line,
-                    "puuid": puuid,
-                    "level": summoner_level
-                },
-                "ranked_solo": {
-                    "tier": apex_rank["tier"],
-                    "rank": apex_rank["rank"],
-                    "lp": apex_rank["lp"],
-                    "wins": apex_rank["wins"],
-                    "losses": apex_rank["losses"],
-                    "total_games": total_games,
-                    "winrate": winrate,
-                    "veteran": apex_rank["veteran"],
-                    "hot_streak": apex_rank["hot_streak"],
-                    "series": apex_rank["series"]
-                },
-                "ranked_flex": None,
-                "data_source": "Riot API (Apex Leaderboard)"
-            }
-        
-        # 5. МЕТОД 3: League Entries (summoner ID)
-        if summoner_id:
-            league_entries = await find_player_in_divisions(
-                summoner_id=summoner_id,
-                platform=platform,
-                api_key=riot_api.api_key
-            )
-            
-            if league_entries:
+            entries = await find_league_entries_by_summoner_id(summoner_id=summoner_id, platform=platform)
+            if entries:
                 result = {
-                    "player": {
-                        "game_name": game_name,
-                        "tag_line": tag_line,
-                        "puuid": puuid,
-                        "level": summoner_level
-                    },
+                    "player": {"game_name": game_name, "tag_line": tag_line, "puuid": puuid, "level": summoner_level},
                     "ranked_solo": None,
                     "ranked_flex": None,
-                    "data_source": "Riot API (League Entries)"
+                    "data_source": "Riot API (League Entries)",
                 }
-                
-                for queue in league_entries:
-                    queue_type = queue.get("queueType")
-                    
-                    # 💾 Сохранение ranked stats
+
+                for q in entries:
+                    qt = q.get("queueType")
+                    wins = q.get("wins", 0)
+                    losses = q.get("losses", 0)
+                    total = wins + losses
+                    winrate = round((wins / total) * 100, 1) if total > 0 else 0
+                    info = {
+                        "tier": q.get("tier"),
+                        "rank": q.get("rank"),
+                        "lp": q.get("leaguePoints", 0),
+                        "wins": wins,
+                        "losses": losses,
+                        "total_games": total,
+                        "winrate": winrate,
+                        "veteran": q.get("veteran", False),
+                        "hot_streak": q.get("hotStreak", False),
+                        "series": q.get("miniSeries"),
+                    }
+
+                    # write to DB best-effort
                     if player:
                         try:
                             crud.create_or_update_ranked_stats(
                                 db=db,
                                 player_id=player.id,
-                                queue_type=queue_type,
-                                tier=queue.get("tier"),
-                                rank=queue.get("rank"),
-                                lp=queue.get("leaguePoints", 0),
-                                wins=queue.get("wins", 0),
-                                losses=queue.get("losses", 0),
-                                veteran=queue.get("veteran", False),
-                                hot_streak=queue.get("hotStreak", False),
+                                queue_type=qt,
+                                tier=info["tier"],
+                                rank=info["rank"],
+                                lp=info["lp"],
+                                wins=info["wins"],
+                                losses=info["losses"],
+                                veteran=info["veteran"],
+                                hot_streak=info["hot_streak"],
                                 data_source="riot_api",
                             )
                         except OperationalError:
                             pass
-                    
-                    wins = queue.get("wins", 0)
-                    losses = queue.get("losses", 0)
-                    total_games = wins + losses
-                    winrate = round((wins / total_games) * 100, 1) if total_games > 0 else 0
-                    
-                    queue_info = {
-                        "tier": queue.get("tier"),
-                        "rank": queue.get("rank"),
-                        "lp": queue.get("leaguePoints", 0),
-                        "wins": wins,
-                        "losses": losses,
-                        "total_games": total_games,
-                        "winrate": winrate,
-                        "veteran": queue.get("veteran", False),
-                        "hot_streak": queue.get("hotStreak", False),
-                        "series": queue.get("miniSeries")
-                    }
-                    
-                    if queue_type == "RANKED_SOLO_5x5":
-                        result["ranked_solo"] = queue_info
-                    elif queue_type == "RANKED_FLEX_SR":
-                        result["ranked_flex"] = queue_info
-                
+
+                    if qt == "RANKED_SOLO_5x5":
+                        result["ranked_solo"] = info
+                    elif qt == "RANKED_FLEX_SR":
+                        result["ranked_flex"] = info
+
                 return result
-        
-        # 6. МЕТОД 4: Fallback - Match History
-        fallback_result = await calculate_from_match_history(
+
+        # 6) Match-history fallback
+        fb = await calculate_from_match_history(
             puuid=puuid,
             summoner_level=summoner_level,
             game_name=game_name,
             tag_line=tag_line,
             region=region,
             platform=platform,
-            api_key=riot_api.api_key
         )
-        
-        fallback_result["data_source"] = "Match History (Fallback)"
-        return fallback_result
-    
+        fb["data_source"] = "Match History (Fallback)"
+        return fb
+
     except RiotAPIError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
@@ -578,31 +386,13 @@ async def debug_summoner(
     game_name: str,
     tag_line: str,
     region: str = "europe",
-    platform: str = "euw1"
+    platform: str = "euw1",
 ):
-    """
-    Debug endpoint
-    """
     try:
-        account_data = await riot_api.get_account_by_riot_id(
-            game_name=game_name,
-            tag_line=tag_line,
-            region=region
-        )
-        puuid = account_data["puuid"]
-        
-        summoner_data = await riot_api.get_summoner_by_puuid(
-            puuid=puuid,
-            platform=platform
-        )
-        
-        return {
-            "puuid": puuid,
-            "summoner_data": summoner_data,
-            "has_id": "id" in summoner_data,
-            "summoner_id": summoner_data.get("id", "NOT FOUND")
-        }
-    
+        account = await riot_api.get_account_by_riot_id(game_name=game_name, tag_line=tag_line, region=region)
+        puuid = account["puuid"]
+        summoner = await riot_api.get_summoner_by_puuid(puuid=puuid, platform=platform)
+        return {"puuid": puuid, "summoner_data": summoner, "has_id": "id" in summoner, "summoner_id": summoner.get("id", "NOT FOUND")}
     except Exception as e:
         return {"error": str(e)}
 

@@ -9,6 +9,10 @@ riot_api = RiotAPIService()
 router = APIRouter()
 
 
+@router.get("/health")
+async def match_health():
+    return {"status": "ok", "endpoint": "/api/match/{match_id}"}
+
 @router.get("/{match_id}", response_model=Dict[str, Any])
 async def get_match_details(match_id: str, region: str = "europe", platform: str = "euw1"):
     """
@@ -31,6 +35,3 @@ async def get_match_details(match_id: str, region: str = "europe", platform: str
         raise HTTPException(status_code=500, detail=f"Match error: {str(e)}")
 
 
-@router.get("/health")
-async def match_health():
-    return {"status": "ok", "endpoint": "/api/match/{match_id}"}

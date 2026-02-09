@@ -5,7 +5,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api import summoner, match, stats, ranked, live, players, lcu, analysis, leaderboard
+from app.api import summoner, match, matches, stats, ranked, live, players, lcu, analysis, leaderboard
+
 
 ENABLE_LCU = os.getenv("ENABLE_LCU", "false").lower() in ("1", "true", "yes")
 
@@ -55,6 +56,7 @@ app.include_router(match.router, prefix="/api/match", tags=["match"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(ranked.router, prefix="/api/ranked", tags=["ranked"])
 app.include_router(live.router, prefix="/api/live", tags=["live"])
+app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 if ENABLE_LCU:
     app.include_router(lcu.router, prefix="/api/lcu", tags=["LCU"])
 app.include_router(players.router, prefix="/api")
